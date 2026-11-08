@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth.router import router as auth_router
+from app.routes.ai_routes import router as ai_router
+
 app = FastAPI()
 
-app.middleware(
+app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
@@ -12,12 +15,12 @@ app.middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    
 )
+
+app.include_router(auth_router)
+app.include_router(ai_router)
+
 
 @app.get("/")
 def root():
-    return {
-        "message": "backend berjalan"
-    }
-
+    return {"message": "backend berjalan"}
