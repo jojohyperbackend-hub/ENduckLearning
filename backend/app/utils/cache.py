@@ -69,6 +69,12 @@ def check_translate_attempt_rate_limit(user_id: str) -> None:
     )
 
 
+def get_daily_token_usage(user_id: str) -> int:
+    with _rate_limit_lock:
+        entry = _daily_token_usage_cache.get(user_id)
+        return entry["total"] if entry else 0
+
+
 def check_and_add_daily_token_usage(user_id: str, token_amount: int) -> None:
     with _rate_limit_lock:
         entry = _daily_token_usage_cache.get(user_id)
