@@ -3,8 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.router import router as auth_router
 from app.routes.ai_routes import router as ai_router
+from app.routes.course_routes import router as course_router
+from app.routes.lesson_routes import router as lesson_router
+from app.routes.progress_routes import router as progress_router
+from app.routes.review_routes import router as review_router
 
-app = FastAPI()
+app = FastAPI(title="EnglishDucAiLms API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,6 +22,10 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(course_router)
+app.include_router(lesson_router)
+app.include_router(review_router)
+app.include_router(progress_router)
 app.include_router(ai_router)
 
 
