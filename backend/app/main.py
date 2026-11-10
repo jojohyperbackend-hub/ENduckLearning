@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,6 +9,8 @@ from app.routes.course_routes import router as course_router
 from app.routes.lesson_routes import router as lesson_router
 from app.routes.progress_routes import router as progress_router
 from app.routes.review_routes import router as review_router
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 
 app = FastAPI(title="EnglishDucAiLms API")
 

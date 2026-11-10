@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str
     OPENROUTER_API_KEY: str
     JWT_SECRET: str
+    ENVIRONMENT: str = "development"
 
     @field_validator(*REQUIRED_FIELDS)
     @classmethod

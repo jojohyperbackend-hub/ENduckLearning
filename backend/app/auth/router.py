@@ -12,6 +12,7 @@ from app.auth.middleware import (
     create_refresh_token,
     decode_token,
 )
+from app.config import settings
 from app.database import get_anon_client, get_service_client
 from app.models.schemas import ApiResponse, AuthUserData, GoogleCallbackRequest
 from app.utils.helpers import error_response, success_response
@@ -21,6 +22,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 SESI_HABIS_MESSAGE = "Sesi kamu abis, silakan login ulang."
 LOGIN_GAGAL_MESSAGE = "Login Google gagal diverifikasi, coba login ulang ya."
 
+COOKIE_SECURE = settings.ENVIRONMENT.strip().lower() == "production"
+
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
     response.set_cookie(
@@ -28,7 +31,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         value=access_token,
         max_age=ACCESS_TOKEN_TTL_SECONDS,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         path="/",
     )
@@ -37,7 +40,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         value=refresh_token,
         max_age=REFRESH_TOKEN_TTL_SECONDS,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         path="/",
     )
