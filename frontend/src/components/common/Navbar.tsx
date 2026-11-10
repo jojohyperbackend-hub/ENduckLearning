@@ -1,13 +1,14 @@
-import { Link } from "react-router";
+import { Link, NavLink, useLocation } from "react-router";
 
 const navLinks = [
   { to: "/", label: "Landing" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/progress", label: "Progress" },
-  { to: "/quiz/generate", label: "Quiz AI" },
+  { to: "/quiz/generate", label: "Quiz AI", match: "/quiz" },
 ];
 
 const Navbar = () => {
+  const { pathname } = useLocation();
   return (
     <header>
       <nav className="flex items-center justify-between gap-4 px-4 py-4 text-sm">
@@ -18,15 +19,26 @@ const Navbar = () => {
           Gramarise
         </Link>
         <div className="flex items-center gap-3 rounded-full border border-[#283c63]/15 bg-[var(--color-bg-card)] px-3 py-2 text-[var(--color-text)] shadow-[0_8px_20px_rgba(40,60,99,0.12)]">
-          {navLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className="rounded-full px-3 py-2 transition hover:text-[var(--color-cta)] hover:bg-[var(--color-cta)]/10"
-            >
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const manualActive = link.match ? pathname.startsWith(link.match) : false;
+
+            return(
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.to === "/"}
+                className={({ isActive }) =>
+                  `rounded-full px-3 py-2 transition ${
+                    isActive || manualActive
+                      ? "bg-cta/20 font-semibold text-cta"
+                      : "hover:text-cta hover:bg-cta/10"
+                  }`
+                }
+              >
+                {link.label}
+              </NavLink>
+            );
+          })}
         </div>
         <Link
           to="/login"
