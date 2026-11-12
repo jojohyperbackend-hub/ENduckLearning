@@ -11,6 +11,10 @@
   --color-correct: #4c9a6b;
   --color-wrong: #d94e3f;
 
+  /* warna turunan (hover states, DESIGN.md bagian 2) */
+  --color-cta-soft: #fa7a8c;
+  --color-text-light: #3b5485;
+
   /* typography */
   --font-heading: "Baloo 2", system-ui, sans-serif;
   --font-body: "Lexend", system-ui, sans-serif;
@@ -37,6 +41,11 @@
   color: var(--color-text);
   background-color: var(--color-bg);
   font-family: var(--font-body);
+
+  /* elevation tokens, DESIGN.md bagian 6 */
+  --shadow-1: 0 2px 8px rgba(40, 60, 99, 0.08);
+  --shadow-2: 0 4px 16px rgba(40, 60, 99, 0.12);
+  --shadow-3: 0 8px 24px rgba(40, 60, 99, 0.16);
 }
 
 body {
@@ -49,4 +58,78 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* ============================================
+   Motion — DESIGN.md Bagian 7
+   Cuma satu momen terarah: hero masuk berurutan pas halaman kebuka.
+   Selebihnya gerak muncul karena aksi user (hover, klik, scroll).
+   ============================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes hero-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .hero-in {
+    opacity: 0;
+    animation: hero-in 500ms ease-out forwards;
+  }
+  .hero-in-1 {
+    animation-delay: 60ms;
+  }
+  .hero-in-2 {
+    animation-delay: 160ms;
+  }
+  .hero-in-3 {
+    animation-delay: 260ms;
+  }
+  .hero-in-4 {
+    animation-delay: 380ms;
+  }
+
+  @keyframes shake-wrong {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-6px);
+    }
+    75% {
+      transform: translateX(6px);
+    }
+  }
+
+  @keyframes pulse-correct {
+    0% {
+      box-shadow: 0 0 0 0 rgba(76, 154, 107, 0.4);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(76, 154, 107, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(76, 154, 107, 0);
+    }
+  }
+
+  .animate-shake-wrong {
+    animation: shake-wrong 400ms ease-out;
+  }
+
+  .animate-pulse-correct {
+    animation: pulse-correct 600ms ease-out;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
 }

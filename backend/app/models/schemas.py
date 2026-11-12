@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Generic, List, Literal, Optional, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 DataT = TypeVar("DataT")
 
@@ -43,6 +43,16 @@ class ApiResponse(BaseModel, Generic[DataT]):
 
 class GoogleCallbackRequest(BaseModel):
     supabase_access_token: str = Field(..., min_length=1)
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=72)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=72)
 
 
 class AuthUserData(BaseModel):
