@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, BrowserRouter } from "react-router";
+import { Navigate, Route, Routes, BrowserRouter, useLocation } from "react-router";
 import type { ReactNode } from "react";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
@@ -30,10 +30,11 @@ const ProtectedRoute = ({ children }: GuardProps) => {
   return isAuthenticated() ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-const App = () => {
+const AppLayout = () => {
+  const location = useLocation();
+  const showFooter = location.pathname === "/";
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
         <div className="sticky top-0 z-50">
           <Navbar />
         </div>
@@ -92,8 +93,17 @@ const App = () => {
           </Routes>
         </main>
 
-        <Footer />
+        {showFooter && <Footer />}
       </div>
+  )
+}
+
+const App = () => {
+  
+
+  return (
+    <BrowserRouter>
+      <AppLayout />      
     </BrowserRouter>
   );
 };
