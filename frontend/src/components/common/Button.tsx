@@ -13,7 +13,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles = {
   default:
-    "cursor-pointer border border-[var(--color-text)]/70 bg-[var(--color-cta)] text-[var(--color-text)] shadow-[0_4px_0_rgba(40,60,99,0.8)] hover:border-[var(--color-text)]/60 hover:bg-[var(--color-bg-card)] hover:text-[var(--color-text)]",
+    "cursor-pointer border border-[var(--color-text)]/70 bg-[var(--color-cta)] text-[var(--color-text)] shadow-[0_4px_0_rgba(40,60,99,0.8)] hover:border-[var(--color-text)]/60 hover:bg-[var(--color-cta-soft)] hover:text-[var(--color-text)] hover:shadow-[0_8px_24px_rgba(40,60,99,0.16)]",
   disabled:
     "cursor-not-allowed border border-[var(--color-text)]/20 bg-[var(--color-bg-card)] text-[var(--color-text)]/55 opacity-80 shadow-[0_4px_0_rgba(40,60,99,0.08)]",
   loading:
@@ -63,6 +63,7 @@ const Button = ({
       className={[
         "inline-flex w-fit items-center justify-center gap-2 rounded-full font-bold transition-all duration-200",
         "font-body",
+        "hover:scale-[1.03] active:scale-[0.98] motion-reduce:hover:scale-100 motion-reduce:active:scale-100",
         sizeStyles[size],
         fullwidth ? "w-full" : "",
         variantStyles[appliedVariant],

@@ -1,77 +1,130 @@
-import { ArrowLeft } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router";
 import Button from "../components/common/Button";
-import Card from "../components/common/Card";
 import Input from "../components/common/Input";
-import GoogleIcon from "./../assets/google.png";
+import { getErrorMessage } from "../api/client";
+import { useAuth } from "../hooks/useAuth";
+
+type Mode = "login" | "register";
+
+const MIN_PASSWORD_LENGTH = 8;
 
 const LoginPage = () => {
+  const { login, register } = useAuth();
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<Mode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const isRegister = mode === "register";
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setError(null);
+    setNotice(null);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setNotice(null);
+
+    if (isRegister && password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Password minimal ${MIN_PASSWORD_LENGTH} karakter.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = { email: email.trim(), password };
+      if (isRegister) {
+        const outcome = await register(payload);
+        if (outcome === "needs_login") {
+          setNotice(
+            "Akun sudah dibuat. Cek email untuk konfirmasi, lalu login.",
+          );
+          setMode("login");
+          setPassword("");
+          return;
+        }
+      } else {
+        await login(payload);
+      }
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <section className="flex min-h-[80vh] items-center justify-center px-4 py-8">
-      <Card variant="auth" className="w-full max-w-[980px]">
-        <section className="relative overflow-hidden bg-[var(--color-bg-card)] px-5 pb-8 pt-5 md:px-8 md:pb-10 md:pt-7">
+    <section className="flex min-h-[60vh] items-center justify-center py-8">
+      <div className="w-full max-w-md rounded-2xl border border-[#283c63]/15 bg-[var(--color-bg-card)] p-6 shadow-xl sm:p-8">
+        <h1 className="font-heading text-3xl font-bold text-[var(--color-text)]">
+          {isRegister ? "Buat akun" : "Masuk ke Grammarise"}
+        </h1>
+        <p className="mt-2 text-[var(--color-text)]/75">
+          {isRegister
+            ? "Daftar pakai email, gratis."
+            : "Lanjut belajar dari lesson terakhirmu."}
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <Input
+            label="Email"
+            type="email"
+            name="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input
+            label="Password"
+            type="password"
+            name="password"
+            autoComplete={isRegister ? "new-password" : "current-password"}
+            required
+            minLength={isRegister ? MIN_PASSWORD_LENGTH : undefined}
+            maxLength={72}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          <p className="min-h-5 text-sm" role="alert" aria-live="polite">
+            {error && (
+              <span className="text-[var(--color-wrong)]">{error}</span>
+            )}
+            {notice && (
+              <span className="text-[var(--color-correct)]">{notice}</span>
+            )}
+          </p>
+
+          <Button
+            type="submit"
+            fullwidth
+            isLoading={isSubmitting}
+            disabled={isSubmitting}
+          >
+            {isRegister ? "Daftar" : "Masuk"}
+          </Button>
+        </form>
+
+        <p className="mt-5 text-sm text-[var(--color-text)]/75">
+          {isRegister ? "Sudah punya akun?" : "Belum punya akun?"}{" "}
           <button
             type="button"
-            aria-label="Back"
-            className="mb-8 flex h-11 w-11 items-center justify-center rounded-full border border-[#283c63]/15 bg-white/35 text-2xl text-[var(--color-text)] shadow-sm transition hover:bg-white/60"
+            onClick={() => switchMode(isRegister ? "login" : "register")}
+            className="font-semibold text-[var(--color-text)] underline underline-offset-4"
           >
-            <ArrowLeft />
+            {isRegister ? "Masuk" : "Daftar"}
           </button>
-
-          <div className="relative z-10">
-            <h2 className="max-w-[320px] font-heading text-[clamp(2.4rem,5vw,4.1rem)] leading-[0.9] font-extrabold tracking-[-0.04em] text-[var(--color-text)]">
-              Login to your
-              <br />
-              account
-            </h2>
-
-            <p className="mt-6 max-w-[340px] text-base font-medium leading-relaxed text-[var(--color-text)]/80 md:text-lg">
-              Welcome back To Grammarise! looks like someone decide to be better
-              at english, huh?
-            </p>
-          </div>
-
-          <div className="pointer-events-none absolute -bottom-12 left-0 right-0 z-0 h-40 opacity-80">
-            {/* logo taro sini */}
-          </div>
-        </section>
-
-        <section className="bg-white px-5 pb-8 pt-6 md:px-8 md:pb-10 md:pt-8">
-          <form className="flex flex-col gap-5">
-            <Input
-              variant="login"
-              label="Email/Username"
-              placeholder="Masukkan email/username"
-              className="border-[var(--color-text)]/15 bg-transparent"
-            />
-            <Input
-              variant="login"
-              label="Password"
-              type="password"
-              placeholder="Masukkan password"
-              className="border-[var(--color-text)]/15 bg-transparent"
-            />
-
-            <div className="mt-3 flex flex-col items-center gap-4">
-              <Button className="w-full rounded-full border-[var(--color-text)]/60 bg-[var(--color-cta)] px-6 py-3 text-lg font-bold text-[var(--color-text)] shadow-[0_6px_0_rgba(40,60,99,0.8)] hover:bg-[var(--color-cta)]/90">
-                Login
-              </Button>
-
-              <p className="text-sm text-[var(--color-text)]/70">Or use</p>
-
-              <Button className="w-full rounded-full border-[var(--color-text)]/60 bg-[var(--color-cta)] px-6 py-3 text-lg font-bold text-[var(--color-text)] shadow-[0_6px_0_rgba(40,60,99,0.8)] hover:bg-[var(--color-cta)]/90">
-                <span className="flex items-center gap-2">
-                  <img src={GoogleIcon} alt="Google" className="h-5 w-5" />
-                  Google
-                </span>
-              </Button>
-            </div>
-          </form>
-
-          <p className="mt-6 text-center text-sm text-[var(--color-text)]/80">
-            Already have account? <span className="font-bold">Sign up</span>
-          </p>
-        </section>
-      </Card>
+        </p>
+      </div>
     </section>
   );
 };

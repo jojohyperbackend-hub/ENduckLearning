@@ -7,7 +7,7 @@ from app.models.schemas import ApiResponse
 from app.services.progress_service import get_user_progress
 from app.utils.helpers import success_response
 
-router = APIRouter(prefix="/progress", tags=["Progress"])
+router = APIRouter(prefix="/progress", tags=["progress"])
 
 
 @router.get("/me", response_model=ApiResponse)

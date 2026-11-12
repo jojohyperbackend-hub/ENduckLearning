@@ -1,100 +1,123 @@
-from typing import List
+from typing import Any, Dict, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.middleware import get_current_user_id
 from app.database import get_service_client
 from app.models.schemas import ApiResponse, CourseOut, LessonSummaryOut, UnitWithLessonsOut
-from app.utils.cache import content_cache, get_or_set_cache
-from app.utils.helpers import success_response
+from app.services.progress_service import fetch_user_progress_row
+from app.utils.cache import get_or_set_cache
+from app.utils.helpers import error_response, success_response
 
-router = APIRouter(tags=["Course"])
-
-
-@router.get("/courses", response_model=ApiResponse)
-def get_courses(user_id: UUID = Depends(get_current_user_id)) -> ApiResponse:
-    service_client = get_service_client()
-    result = service_client.table("course").select("course_id, title").execute()
-    courses = [CourseOut(**row) for row in (result.data or [])]
-    return success_response(courses)
+router = APIRouter(tags=["courses"])
 
 
-def _fetch_units_with_lessons_raw(course_id: str) -> List[dict]:
-    service_client = get_service_client()
-    result = (
-        service_client.table("unit")
-        .select("unit_id, course_id, title, order_index, lesson(lesson_id, order_index, xp_reward_base)")
-        .eq("course_id", course_id)
+def _load_all_courses() -> List[Dict[str, Any]]:
+    client = get_service_client()
+    result = client.table("course").select("course_id, title").order("title").execute()
+    return result.data
+
+
+def _load_units_with_lessons(course_id: UUID) -> List[Dict[str, Any]]:
+    client = get_service_client()
+    units_result = (
+        client.table("unit")
+        .select("unit_id, course_id, title, order_index")
+        .eq("course_id", str(course_id))
         .order("order_index")
         .execute()
     )
-    units = result.data or []
-    for unit in units:
-        unit["lesson"] = sorted(unit.get("lesson") or [], key=lambda item: item["order_index"])
+    units = units_result.data
+
+    lessons_result = (
+        client.table("lesson")
+        .select("lesson_id, unit_id, order_index, xp_reward_base")
+        .in_("unit_id", [u["unit_id"] for u in units])
+        .order("order_index")
+        .execute()
+    )
+    lessons_by_unit: Dict[str, List[Dict[str, Any]]] = {}
+    for lesson_row in lessons_result.data:
+        lessons_by_unit.setdefault(lesson_row["unit_id"], []).append(lesson_row)
+
+    for unit_row in units:
+        unit_row["lessons"] = lessons_by_unit.get(unit_row["unit_id"], [])
+
     return units
 
 
+@router.get("/courses", response_model=ApiResponse)
+def get_courses() -> ApiResponse:
+    courses_data = get_or_set_cache("courses:all", _load_all_courses)
+    courses = [CourseOut(course_id=UUID(c["course_id"]), title=c["title"]) for c in courses_data]
+    return success_response(courses)
+
+
 @router.get("/units/{course_id}", response_model=ApiResponse)
-def get_units_by_course(course_id: UUID, user_id: UUID = Depends(get_current_user_id)) -> ApiResponse:
-    cache_key = f"units_by_course:{course_id}"
-    units_raw = get_or_set_cache(content_cache, cache_key, lambda: _fetch_units_with_lessons_raw(str(course_id)))
+def get_units(course_id: UUID, user_id: UUID = Depends(get_current_user_id)) -> ApiResponse:
+    client = get_service_client()
+    course_check = (
+        client.table("course")
+        .select("course_id")
+        .eq("course_id", str(course_id))
+        .limit(1)
+        .execute()
+    )
+    if not course_check.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course tidak ditemukan")
 
-    if not units_raw:
-        raise HTTPException(status_code=404, detail="Course gak ketemu atau belum ada unit-nya.")
+    units_data = get_or_set_cache(
+        f"units:{course_id}", lambda: _load_units_with_lessons(course_id)
+    )
 
-    flattened_lesson_ids: List[str] = []
-    for unit in units_raw:
-        for lesson in unit["lesson"]:
-            flattened_lesson_ids.append(lesson["lesson_id"])
+    progress_row = fetch_user_progress_row(user_id)
+    current_lesson_id = progress_row.get("current_lesson_id")
 
-    service_client = get_service_client()
-    progress_result = (
-        service_client.table("user_progress")
-        .select("current_lesson_id")
+    completed_lessons_result = (
+        client.table("lesson_completion")
+        .select("lesson_id")
         .eq("user_id", str(user_id))
         .execute()
     )
-    progress_rows = progress_result.data or []
-    current_lesson_id = progress_rows[0]["current_lesson_id"] if progress_rows else None
-
-    if current_lesson_id is not None and current_lesson_id in flattened_lesson_ids:
-        current_position = flattened_lesson_ids.index(current_lesson_id)
-    else:
-        current_position = -1
+    completed_lesson_ids = {row["lesson_id"] for row in completed_lessons_result.data}
 
     units_out: List[UnitWithLessonsOut] = []
-    global_index = 0
-    for unit in units_raw:
+    previous_unit_fully_completed = True
+
+    for unit_row in units_data:
         lessons_out: List[LessonSummaryOut] = []
-        for lesson in unit["lesson"]:
-            if current_position == -1:
-                completed = False
-                locked = global_index > 0
-            else:
-                completed = global_index < current_position
-                locked = global_index > current_position
+        previous_lesson_completed_in_unit = True
+
+        for lesson_row in unit_row["lessons"]:
+            lesson_id = lesson_row["lesson_id"]
+            is_completed = lesson_id in completed_lesson_ids
+            is_locked = (not previous_unit_fully_completed) or (not previous_lesson_completed_in_unit)
+
             lessons_out.append(
                 LessonSummaryOut(
-                    lesson_id=lesson["lesson_id"],
-                    order_index=lesson["order_index"],
-                    xp_reward_base=lesson["xp_reward_base"],
-                    locked=locked,
-                    completed=completed,
+                    lesson_id=UUID(lesson_id),
+                    order_index=lesson_row["order_index"],
+                    xp_reward_base=lesson_row["xp_reward_base"],
+                    locked=is_locked and not is_completed,
+                    completed=is_completed,
                 )
             )
-            global_index += 1
+            previous_lesson_completed_in_unit = is_completed
 
-        unit_locked = lessons_out[0].locked if lessons_out else True
+        unit_fully_completed = all(lo.completed for lo in lessons_out) if lessons_out else False
+        unit_locked = not previous_unit_fully_completed
+
         units_out.append(
             UnitWithLessonsOut(
-                unit_id=unit["unit_id"],
-                course_id=unit["course_id"],
-                title=unit["title"],
-                order_index=unit["order_index"],
+                unit_id=UUID(unit_row["unit_id"]),
+                course_id=UUID(unit_row["course_id"]),
+                title=unit_row["title"],
+                order_index=unit_row["order_index"],
                 locked=unit_locked,
                 lessons=lessons_out,
             )
         )
+        previous_unit_fully_completed = unit_fully_completed
 
     return success_response(units_out)

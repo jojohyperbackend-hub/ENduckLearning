@@ -1,33 +1,51 @@
-import Badge from "../common/Badge";
+import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import Button from "../common/Button";
 import illustration from "../../assets/landing.png";
-import { Check, Clock, Smartphone } from "lucide-react";
 
 const HeroSection = () => {
+  const [parallaxY, setParallaxY] = useState(0);
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    if (prefersReducedMotion) return;
+
+    const handleScroll = () => {
+      setParallaxY(Math.min(window.scrollY, 600) * -0.12);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <section className="flex">
-      <div className="flex flex-col gap-5">
-        <section className="flex flex-col gap-5">
-          <Badge variant="danger">Bahasa Inggris, satu langkah lagi</Badge>
-          <h1 className="text-5xl font-heading font-extrabold">
-            Belajar Bahasa Inggris Jadi Seru dan Gampang
-          </h1>
-          <p>
-            Kayak main game, tapi otakmu makin jago Bahasa Inggris. Belajar step
-            by step, gratis!
-          </p>
-        </section>
-        <section className="flex flex-col gap-4">
-          <Button size="sm">Mulai belajar gratis</Button>
-          <div>
-            <Badge icon={Check} iconClassName="text-[var(--color-correct)]">100% Gratis</Badge>
-            <Badge icon={Clock} iconClassName="text-[var(--color-correct)]">10 menit/hari</Badge>
-            <Badge icon={Smartphone} iconClassName="text-[var(--color-correct)]">Bisa dari HP</Badge>
-          </div>
-        </section>
+    <section className="flex flex-col gap-10 pt-4 lg:flex-row lg:items-center lg:gap-14">
+      <div className="flex flex-col gap-6 lg:basis-[61.8%]">
+        <h1 className="hero-in hero-in-1 max-w-[16ch] font-heading text-[2.5rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">
+          Belajar Bahasa Inggris, tapi rasanya kayak main game.
+        </h1>
+        <p className="hero-in hero-in-2 max-w-[46ch] text-body-lg leading-7">
+          Latihan pendek tiap hari, dari pilihan ganda sampai terjemahan. Salah
+          dikit gak apa-apa, soalnya bakal muncul lagi sampai kamu hafal.
+        </p>
+        <div className="hero-in hero-in-3 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+          <Link to="/login">
+            <Button size="lg">Mulai belajar gratis</Button>
+          </Link>
+          <p className="text-body">Gratis, 10 menit sehari, bisa dari HP.</p>
+        </div>
       </div>
-      <div className="w-full max-w-[400px]">
-        <img src={illustration} alt="illustration" className="w-full h-auto" />
+
+      <div
+        className="hero-in hero-in-4 w-full max-w-[420px] lg:basis-[38.2%]"
+        style={{ transform: `translateY(${parallaxY}px)` }}
+      >
+        <img
+          src={illustration}
+          alt="Maskot tunas hijau membawa buku, naik tangga batu"
+          className="h-auto w-full -rotate-2 rounded-2xl border-2 border-[var(--color-text)] shadow-[8px_8px_0_var(--color-text)]"
+        />
       </div>
     </section>
   );

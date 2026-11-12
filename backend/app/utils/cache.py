@@ -1,89 +1,85 @@
 import threading
-from typing import Any, Callable, MutableMapping
+from datetime import date
+from typing import Any, Callable, Dict, Tuple
 
 from cachetools import TTLCache
 
 PRACTICE_GENERATE_LIMIT_PER_HOUR = 10
 TRANSLATE_ATTEMPT_LIMIT_PER_HOUR = 30
 DAILY_TOKEN_BUDGET = 50000
-CONTENT_CACHE_TTL_SECONDS = 600
-RATE_LIMIT_WINDOW_SECONDS = 3600
-DAILY_TOKEN_WINDOW_SECONDS = 86400
 
-content_cache: TTLCache = TTLCache(maxsize=100, ttl=CONTENT_CACHE_TTL_SECONDS)
-
-_practice_generate_rate_cache: TTLCache = TTLCache(maxsize=10000, ttl=RATE_LIMIT_WINDOW_SECONDS)
-_translate_attempt_rate_cache: TTLCache = TTLCache(maxsize=10000, ttl=RATE_LIMIT_WINDOW_SECONDS)
-_daily_token_usage_cache: TTLCache = TTLCache(maxsize=10000, ttl=DAILY_TOKEN_WINDOW_SECONDS)
-
+content_cache: TTLCache = TTLCache(maxsize=100, ttl=600)
 _content_cache_lock = threading.Lock()
+
+_practice_generate_hits: TTLCache = TTLCache(maxsize=10000, ttl=3600)
+_translate_attempt_hits: TTLCache = TTLCache(maxsize=10000, ttl=3600)
 _rate_limit_lock = threading.Lock()
+
+_daily_token_usage: Dict[Tuple[str, date], int] = {}
+_daily_token_usage_lock = threading.Lock()
 
 
 class RateLimitExceeded(Exception):
-    def __init__(self, message: str, retry_after_seconds: int) -> None:
+    def __init__(self, message: str) -> None:
         super().__init__(message)
         self.message = message
-        self.retry_after_seconds = retry_after_seconds
 
 
-def get_or_set_cache(cache: MutableMapping, key: str, fetch_fn: Callable[[], Any]) -> Any:
+def get_or_set_cache(cache_key: str, loader: Callable[[], Any]) -> Any:
     with _content_cache_lock:
-        if key in cache:
-            return cache[key]
-    value = fetch_fn()
+        if cache_key in content_cache:
+            return content_cache[cache_key]
+    value = loader()
     with _content_cache_lock:
-        cache[key] = value
+        content_cache[cache_key] = value
     return value
 
 
-def invalidate_cache_key(cache: MutableMapping, key: str) -> None:
+def invalidate_cache_key(cache_key: str) -> None:
     with _content_cache_lock:
-        cache.pop(key, None)
+        content_cache.pop(cache_key, None)
 
 
-def _check_and_increment(cache: TTLCache, user_id: str, limit: int, window_seconds: int) -> None:
+def _check_hourly_limit(cache: TTLCache, user_id: str, limit: int, feature_name: str) -> None:
     with _rate_limit_lock:
-        entry = cache.get(user_id)
-        if entry is None:
-            entry = {"count": 0}
-            cache[user_id] = entry
-        if entry["count"] >= limit:
-            jam = window_seconds // 3600
+        current_count = cache.get(user_id, 0)
+        if current_count >= limit:
             raise RateLimitExceeded(
-                f"Kamu udah pakai fitur ini {entry['count']} kali dari batas {limit} kali per {jam} jam. Coba lagi nanti ya.",
-                window_seconds,
+                f"Batas penggunaan {feature_name} tercapai ({limit}x per jam), coba lagi nanti"
             )
-        entry["count"] += 1
+        cache[user_id] = current_count + 1
 
 
 def check_practice_generate_rate_limit(user_id: str) -> None:
-    _check_and_increment(
-        _practice_generate_rate_cache, user_id, PRACTICE_GENERATE_LIMIT_PER_HOUR, RATE_LIMIT_WINDOW_SECONDS
+    _check_hourly_limit(
+        _practice_generate_hits, user_id, PRACTICE_GENERATE_LIMIT_PER_HOUR, "generate soal latihan"
     )
 
 
 def check_translate_attempt_rate_limit(user_id: str) -> None:
-    _check_and_increment(
-        _translate_attempt_rate_cache, user_id, TRANSLATE_ATTEMPT_LIMIT_PER_HOUR, RATE_LIMIT_WINDOW_SECONDS
+    _check_hourly_limit(
+        _translate_attempt_hits, user_id, TRANSLATE_ATTEMPT_LIMIT_PER_HOUR, "percobaan translate"
     )
 
 
-def get_daily_token_usage(user_id: str) -> int:
-    with _rate_limit_lock:
-        entry = _daily_token_usage_cache.get(user_id)
-        return entry["total"] if entry else 0
+def check_and_add_daily_token_usage(user_id: str, token_count: int) -> None:
+    today = date.today()
+    key = (user_id, today)
+    with _daily_token_usage_lock:
+        stale_keys = [existing_key for existing_key in _daily_token_usage if existing_key[1] != today]
+        for stale_key in stale_keys:
+            del _daily_token_usage[stale_key]
 
-
-def check_and_add_daily_token_usage(user_id: str, token_amount: int) -> None:
-    with _rate_limit_lock:
-        entry = _daily_token_usage_cache.get(user_id)
-        if entry is None:
-            entry = {"total": 0}
-            _daily_token_usage_cache[user_id] = entry
-        if entry["total"] + token_amount > DAILY_TOKEN_BUDGET:
+        current_usage = _daily_token_usage.get(key, 0)
+        if current_usage + token_count > DAILY_TOKEN_BUDGET:
             raise RateLimitExceeded(
-                f"Total token AI kamu hari ini udah {entry['total']} dari batas {DAILY_TOKEN_BUDGET} token. Coba lagi besok ya.",
-                DAILY_TOKEN_WINDOW_SECONDS,
+                f"Batas penggunaan token AI harian tercapai ({DAILY_TOKEN_BUDGET} token/hari)"
             )
-        entry["total"] += token_amount
+        _daily_token_usage[key] = current_usage + token_count
+
+
+def get_daily_token_usage(user_id: str) -> int:
+    today = date.today()
+    key = (user_id, today)
+    with _daily_token_usage_lock:
+        return _daily_token_usage.get(key, 0)
