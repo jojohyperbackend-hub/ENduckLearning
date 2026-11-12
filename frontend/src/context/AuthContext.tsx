@@ -3,12 +3,19 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import * as authApi from "../api/authApi";
 import { setUnauthorizedHandler } from "../api/client";
 import { getMyProgress } from "../api/progressApi";
+import {
+  clearOAuthParamsFromUrl,
+  getSupabase,
+  hasOAuthCallback,
+  readOAuthError,
+} from "../lib/supabase";
 import type {
   AuthStatus,
   LoginPayload,
@@ -25,6 +32,10 @@ export interface AuthContextValue {
   // "needs_login": akun jadi tapi belum ada sesi (Supabase "Confirm email" nyala).
   register: (payload: RegisterPayload) => Promise<RegisterOutcome>;
   logout: () => Promise<void>;
+  // Redirect ke halaman login Google (via Supabase). Browser pindah halaman.
+  startGoogleLogin: () => Promise<void>;
+  // Dipanggil di /login setelah balik dari Google. false = URL bukan hasil Google.
+  completeGoogleLogin: () => Promise<boolean>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- hook-nya ada di hooks/useAuth.ts
@@ -84,6 +95,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
+  const startGoogleLogin = useCallback(async () => {
+    const { error } = await getSupabase().auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/login` },
+    });
+    if (error) throw new Error(error.message);
+  }, []);
+
+  // StrictMode (dev) menjalankan effect dua kali; request yang sedang jalan dipakai bersama.
+  const googleExchangeRef = useRef<Promise<boolean> | null>(null);
+
+  const completeGoogleLogin = useCallback((): Promise<boolean> => {
+    if (googleExchangeRef.current) return googleExchangeRef.current;
+    if (!hasOAuthCallback()) return Promise.resolve(false);
+
+    const exchange = (async () => {
+      const urlError = readOAuthError();
+      if (urlError) {
+        clearOAuthParamsFromUrl();
+        throw new Error(urlError);
+      }
+
+      const supabase = getSupabase();
+      try {
+        // supabase-js membaca token dari URL saat dibuat; getSession menunggu itu selesai.
+        const { data, error } = await supabase.auth.getSession();
+        const accessToken = data.session?.access_token;
+        if (error || !accessToken) {
+          throw new Error("Google login failed. Please try again.");
+        }
+        const authUser = await authApi.loginWithGoogle(accessToken);
+        setUser({ user_id: authUser.user_id, email: authUser.email });
+        setStatus("authenticated");
+        return true;
+      } finally {
+        clearOAuthParamsFromUrl();
+        // Token Supabase sudah tidak dipakai; sesi app sekarang cookie backend.
+        await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      }
+    })().finally(() => {
+      googleExchangeRef.current = null;
+    });
+
+    googleExchangeRef.current = exchange;
+    return exchange;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -101,8 +159,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       login,
       register,
       logout,
+      startGoogleLogin,
+      completeGoogleLogin,
     }),
-    [user, status, login, register, logout],
+    [user, status, login, register, logout, startGoogleLogin, completeGoogleLogin],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

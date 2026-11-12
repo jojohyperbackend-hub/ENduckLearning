@@ -4,6 +4,7 @@ import LoadingSpinner from "./LoadingSpinner";
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "disabled" | "loading";
   isLoading?: boolean;
+  loadingText?: string;
   icon?: LucideIcon;
   iconProps?: LucideProps;
   iconPosition?: "left" | "right";
@@ -29,6 +30,7 @@ const sizeStyles = {
 const Button = ({
   variant = "default",
   isLoading = false,
+  loadingText = "Memuat...",
   icon,
   iconProps,
   iconPosition = "left",
@@ -79,7 +81,7 @@ const Button = ({
             size="sm"
             className="border-[var(--color-text)]/20 border-t-white"
           />
-          <span>Memuat...</span>
+          <span>{loadingText}</span>
         </>
       ) : (
         <>

@@ -26,9 +26,9 @@ interface GuardProps {
 
 // Tunggu cek sesi (cookie) selesai dulu biar gak sempat ke-redirect salah.
 const SessionLoading = () => (
-  <p className="py-24 text-center text-body-lg" role="status">
+  <div className="flex justify-center py-24" role="status">
     <LoadingSpinner />
-  </p>
+  </div>
 );
 
 const PublicOnlyRoute = ({ children }: GuardProps) => {

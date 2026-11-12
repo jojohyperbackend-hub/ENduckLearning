@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import {
   AnimatePresence,
@@ -12,6 +12,8 @@ import Card from "../components/common/Card";
 import { getErrorMessage } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { ArrowLeft } from "lucide-react";
+import googleIcon from "../assets/google.png";
+import { hasOAuthCallback } from "../lib/supabase";
 
 type Mode = "login" | "register";
 
@@ -55,7 +57,7 @@ const fadeUp: Variants = {
 };
 
 const LoginPage = () => {
-  const { login, register } = useAuth();
+  const { login, register, startGoogleLogin, completeGoogleLogin } = useAuth();
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
 
@@ -64,6 +66,8 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // true dari awal kalau halaman ini kebuka dari redirect Google (lagi nuker token)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(hasOAuthCallback);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -80,8 +84,25 @@ const LoginPage = () => {
     setConfirmPassword("");
   };
 
-  const handleGoogle = () => {
-    // TODO: sambungin ke OAuth Google (mis. supabase.auth.signInWithOAuth)
+  // Balik dari Google: tukar token Supabase jadi sesi cookie backend.
+  // Kalau sukses, route guard otomatis pindah ke /dashboard.
+  useEffect(() => {
+    if (!hasOAuthCallback()) return;
+    completeGoogleLogin()
+      .catch((err) => setError(getErrorMessage(err)))
+      .finally(() => setIsGoogleLoading(false));
+  }, [completeGoogleLogin]);
+
+  const handleGoogle = async () => {
+    setError(null);
+    setNotice(null);
+    setIsGoogleLoading(true);
+    try {
+      await startGoogleLogin(); // browser pindah ke Google
+    } catch (err) {
+      setError(getErrorMessage(err));
+      setIsGoogleLoading(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -91,11 +112,11 @@ const LoginPage = () => {
 
     if (isRegister) {
       if (password.length < MIN_PASSWORD_LENGTH) {
-        setError(`Password minimal ${MIN_PASSWORD_LENGTH} karakter.`);
+        setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
         return;
       }
       if (password !== confirmPassword) {
-        setError("Password dan Repeat Password harus sama.");
+        setError("Passwords do not match.");
         return;
       }
     }
@@ -107,7 +128,7 @@ const LoginPage = () => {
         const outcome = await register(payload);
         if (outcome === "needs_login") {
           setNotice(
-            "Akun sudah dibuat. Cek email untuk konfirmasi, lalu login.",
+            "Account created. Check your email to confirm it, then log in.",
           );
           setMode("login");
           setPassword("");
@@ -285,7 +306,8 @@ const LoginPage = () => {
                   type="submit"
                   fullwidth
                   isLoading={isSubmitting}
-                  disabled={isSubmitting}
+                  loadingText="Please wait..."
+                  disabled={isSubmitting || isGoogleLoading}
                 >
                   {isRegister ? "Sign Up" : "Login"}
                 </Button>
@@ -297,13 +319,13 @@ const LoginPage = () => {
                 <Button
                   type="button"
                   fullwidth
-                  disabled={isSubmitting}
+                  isLoading={isGoogleLoading}
+                  loadingText="Please wait..."
+                  disabled={isSubmitting || isGoogleLoading}
                   onClick={handleGoogle}
                 >
                   <span className="flex items-center justify-center gap-2">
-                    <span className="font-heading text-lg font-extrabold leading-none">
-                      G
-                    </span>
+                    <img src={googleIcon} alt="" className="size-5" />
                     Google
                   </span>
                 </Button>
@@ -317,6 +339,7 @@ const LoginPage = () => {
                 <button
                   type="button"
                   onClick={() => switchMode(isRegister ? "login" : "register")}
+                  disabled={isSubmitting || isGoogleLoading}
                   className="font-semibold text-[var(--color-text)] underline underline-offset-4"
                 >
                   {isRegister ? "Sign in" : "Sign up"}

@@ -21,6 +21,11 @@ from app.models.schemas import (
     LoginRequest,
     RegisterRequest,
 )
+from app.services.credential_service import (
+    create_user_with_password,
+    email_exists,
+    verify_user_credentials,
+)
 from app.services.progress_service import ensure_user_progress_exists
 from app.utils.helpers import error_response, success_response
 
@@ -85,47 +90,26 @@ def google_callback(payload: GoogleCallbackRequest, response: Response) -> ApiRe
 
 @router.post("/register", response_model=ApiResponse)
 def register(payload: RegisterRequest, response: Response) -> ApiResponse:
-    anon_client = get_anon_client()
+    # Email+password disimpan di tabel kita sendiri (app_user), TERPISAH dari
+    # Supabase Auth. Supabase Auth cuma dipakai buat login Google.
+    if email_exists(payload.email):
+        return error_response(EMAIL_SUDAH_TERDAFTAR_MESSAGE)
+
     try:
-        auth_result = anon_client.auth.sign_up(
-            {"email": payload.email, "password": payload.password}
-        )
+        user_id = create_user_with_password(payload.email, payload.password)
     except Exception as exc:
-        message = getattr(exc, "message", str(exc)).lower()
-        if "already registered" in message or "already exists" in message or "already been registered" in message:
-            return error_response(EMAIL_SUDAH_TERDAFTAR_MESSAGE)
         logger.warning("Registrasi gagal: %s", str(exc))
         return error_response(REGISTER_GAGAL_MESSAGE)
-
-    supabase_user = auth_result.user if auth_result else None
-    if supabase_user is None or not supabase_user.id:
-        return error_response(REGISTER_GAGAL_MESSAGE)
-
-    user_id = UUID(supabase_user.id)
-    ensure_user_progress_exists(user_id)
-
-    if auth_result.session is None or not auth_result.session.access_token:
-        return success_response(AuthUserData(user_id=user_id, email=payload.email))
 
     return _finalize_login(user_id, payload.email, response)
 
 
 @router.post("/login", response_model=ApiResponse)
 def login(payload: LoginRequest, response: Response) -> ApiResponse:
-    anon_client = get_anon_client()
-    try:
-        auth_result = anon_client.auth.sign_in_with_password(
-            {"email": payload.email, "password": payload.password}
-        )
-    except Exception as exc:
-        logger.warning("Login gagal: %s", str(exc))
+    user_id = verify_user_credentials(payload.email, payload.password)
+    if user_id is None:
         return error_response(LOGIN_GAGAL_MESSAGE)
 
-    supabase_user = auth_result.user if auth_result else None
-    if supabase_user is None or not supabase_user.id or auth_result.session is None:
-        return error_response(LOGIN_GAGAL_MESSAGE)
-
-    user_id = UUID(supabase_user.id)
     return _finalize_login(user_id, payload.email, response)
 
 

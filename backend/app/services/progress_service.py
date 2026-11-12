@@ -3,7 +3,6 @@ from uuid import UUID
 
 from app.database import get_service_client
 from app.models.schemas import BadgeOut, ProgressOut
-from app.utils.helpers import utcnow
 
 HEARTS_MIN = 0
 HEARTS_MAX = 5
@@ -28,7 +27,6 @@ def ensure_user_progress_exists(user_id: UUID) -> None:
             "current_streak": 0,
             "hearts_remaining": HEARTS_MAX,
             "current_lesson_id": None,
-            "last_activity_at": utcnow().isoformat(),
         }
     ).execute()
 
@@ -86,9 +84,9 @@ def add_xp(user_id: UUID, xp_amount: int) -> int:
     client = get_service_client()
     progress_row = fetch_user_progress_row(user_id)
     new_total_xp = progress_row["total_xp"] + xp_amount
-    client.table("user_progress").update(
-        {"total_xp": new_total_xp, "last_activity_at": utcnow().isoformat()}
-    ).eq("user_id", str(user_id)).execute()
+    client.table("user_progress").update({"total_xp": new_total_xp}).eq(
+        "user_id", str(user_id)
+    ).execute()
     return new_total_xp
 
 
