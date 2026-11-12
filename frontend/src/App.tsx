@@ -17,6 +17,8 @@ import QuizGeneratePage from "./pages/QuizGeneratePage";
 import Navbar from "./components/common/Navbar";
 import Footer from "./components/landing/Footer";
 import { useAuth } from "./hooks/useAuth";
+import LoadingSpinner from "./components/common/LoadingSpinner";
+import { FloatingWords } from "./components/common/FloatingWords";
 
 interface GuardProps {
   children: ReactNode;
@@ -25,7 +27,7 @@ interface GuardProps {
 // Tunggu cek sesi (cookie) selesai dulu biar gak sempat ke-redirect salah.
 const SessionLoading = () => (
   <p className="py-24 text-center text-body-lg" role="status">
-    Memuat...
+    <LoadingSpinner />
   </p>
 );
 
@@ -101,15 +103,18 @@ const useSmoothScroll = () => {
 
 const AppLayout = () => {
   const location = useLocation();
-  const showFooter = location.pathname === "/";
+  const showOnLanding = location.pathname === "/";
+  const showFloatingWords =
+    location.pathname === "/" ||
+    location.pathname === "/login" ||
+    location.pathname.startsWith("/lesson");
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <div className="sticky top-0 z-50">
-        <Navbar />
-      </div>
+    <div className="grid-bg relative isolate min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      {showFloatingWords && <FloatingWords />}
+      <div className="sticky top-0 z-50">{showOnLanding && <Navbar />}</div>
 
-      <main className="mx-auto max-w-7xl px-4">
+      <main className="min-h-screen flex flex-col justify-center mx-auto max-w-7xl px-4">
         <Routes>
           <Route
             path="/"
@@ -163,7 +168,7 @@ const AppLayout = () => {
         </Routes>
       </main>
 
-      {showFooter && <Footer />}
+      {showOnLanding && <Footer />}
     </div>
   );
 };

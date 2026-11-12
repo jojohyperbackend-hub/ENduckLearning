@@ -1,14 +1,21 @@
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
-  variant?: "default" | "login"
+  variant?: "default" | "login";
 };
 
 const variantStyles = {
-    default: "w-full rounded-xl border border-[#283c63]/15 bg-white px-3 py-2.5 text-sm text-[var(--color-text)] outline-none transition placeholder:text-[var(--color-text)]/45 focus:border-[var(--color-cta)] focus:ring-2 focus:ring-[var(--color-cta)]/15",
-    login: "w-full border-b border-[var(--color-text)] px-3 py-2.5 text-sm text-[var(--color-text)] outline-none transition placeholder:text-[var(--color-text)]/45"
-  }
+  default:
+    "w-full rounded-xl border border-[#283c63]/15 bg-white px-3 py-2.5 text-sm text-[var(--color-text)] outline-none transition placeholder:text-[var(--color-text)]/45 focus:border-[var(--color-cta)] focus:ring-2 focus:ring-[var(--color-cta)]/15",
+  login:
+    "w-full border-b border-[var(--color-text)] px-3 py-2.5 text-sm text-[var(--color-text)] outline-none transition placeholder:text-[var(--color-text)]/45 focus:outline-none focus:ring-0",
+};
 
-const Input = ({ label, variant = "default", className = "", ...props }: InputProps) => {
+const Input = ({
+  label,
+  variant = "default",
+  className = "",
+  ...props
+}: InputProps) => {
   const classes = [variantStyles[variant], className].filter(Boolean).join(" ");
 
   return (

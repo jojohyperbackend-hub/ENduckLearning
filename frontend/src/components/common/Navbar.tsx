@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { Menu, X } from "lucide-react";
-import {
-  AnimatePresence,
-  motion,
-  useMotionTemplate,
-  useMotionValueEvent,
-  useScroll,
-  useSpring,
-  useTransform,
-} from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { scrollToSection } from "../../App";
 
 // Nav khusus landing page: scrollspy ke section, sesuai DESIGN.md
@@ -30,41 +22,26 @@ const APP_LINKS = [
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const { scrollY } = useScroll();
   const isLandingPage = pathname === "/";
 
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
-  );
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
   const [activeSection, setActiveSection] = useState(LANDING_SECTIONS[0].id);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isHidden, setIsHidden] = useState(false);
 
+  // Pas layar melebar ke desktop, menu mobile otomatis ketutup
   useEffect(() => {
     const desktopQuery = window.matchMedia("(min-width: 768px)");
-    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const handleDesktopChange = (event: MediaQueryListEvent) => {
-      setIsDesktop(event.matches);
       if (event.matches) setIsMobileMenuOpen(false);
     };
-    const handleMotionChange = (event: MediaQueryListEvent) =>
-      setPrefersReducedMotion(event.matches);
 
     desktopQuery.addEventListener("change", handleDesktopChange);
-    motionQuery.addEventListener("change", handleMotionChange);
     return () => {
       desktopQuery.removeEventListener("change", handleDesktopChange);
-      motionQuery.removeEventListener("change", handleMotionChange);
     };
   }, []);
 
-  // Tutup menu mobile + kunci scroll body selama menu kebuka
+  // Kunci scroll body selama menu mobile kebuka
   useEffect(() => {
     if (!isMobileMenuOpen) return;
     const previousOverflow = document.body.style.overflow;
@@ -76,70 +53,42 @@ const Navbar = () => {
 
   // Scrollspy: deteksi section mana yang lagi di tengah layar, biar
   // nav "ngikutin" konten pas discroll dari atas ke bawah (ataupun sebaliknya)
+  // Dihitung dari posisi scroll (bukan IntersectionObserver) dan section
+  // di-query ulang tiap update, jadi tetep jalan walau section baru muncul
+  // di DOM setelah Navbar mount (lazy load, Suspense, dll).
   useEffect(() => {
     if (!isLandingPage) return;
 
-    const sectionElements = LANDING_SECTIONS.map((section) =>
-      document.getElementById(section.id)
-    ).filter((el): el is HTMLElement => el !== null);
-    if (sectionElements.length === 0) return;
+    let frame = 0;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: "-45% 0px -45% 0px", threshold: 0 }
-    );
-    sectionElements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    const updateActiveSection = () => {
+      frame = 0;
+      const middle = window.innerHeight / 2;
+
+      for (const section of LANDING_SECTIONS) {
+        const el = document.getElementById(section.id);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= middle && rect.bottom > middle) {
+          setActiveSection(section.id);
+          break;
+        }
+      }
+    };
+
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(updateActiveSection);
+    };
+
+    updateActiveSection();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
   }, [isLandingPage]);
-
-  // scroll-linked, bukan on/off kasar: transparan di atas, solid + shadow
-  // makin kuat makin ke bawah (DESIGN.md 7.1), diinterpolasi halus lewat spring
-  const scrollProgress = useTransform(scrollY, [0, 120], [0, 1], {
-    clamp: true,
-  });
-  const smoothProgress = useSpring(scrollProgress, {
-    stiffness: 260,
-    damping: 32,
-  });
-  const appliedProgress = prefersReducedMotion ? scrollProgress : smoothProgress;
-
-  const backgroundOpacity = useTransform(appliedProgress, [0, 1], [0, 0.95]);
-  const background = useMotionTemplate`rgba(251, 232, 211, ${backgroundOpacity})`;
-  const shadowOpacity = useTransform(appliedProgress, [0, 1], [0, 0.12]);
-  const boxShadow = useMotionTemplate`0 4px 16px rgba(40, 60, 99, ${shadowOpacity})`;
-  // backdrop-blur cukup berat buat GPU HP low-end, jadi cuma dipakai di desktop
-  const backdropBlur = useTransform(appliedProgress, (value) =>
-    isDesktop && value > 0.05 ? "blur(10px)" : "blur(0px)"
-  );
-
-  // Efek scroll atas/bawah manual: navbar nyelip ke atas pas discroll ke
-  // bawah (fokus ke konten), muncul lagi pas discroll ke atas — jalan buat
-  // scroll manual (wheel/touch) maupun smooth-scroll dari Lenis, karena
-  // keduanya sama-sama update posisi scroll window asli.
-  useMotionValueEvent(scrollY, "change", (latest) => {
-    if (prefersReducedMotion || isMobileMenuOpen) {
-      setIsHidden(false);
-      return;
-    }
-    const previous = scrollY.getPrevious() ?? 0;
-    const delta = latest - previous;
-
-    if (latest < 100) {
-      setIsHidden(false);
-      return;
-    }
-    if (delta > 4) {
-      setIsHidden(true);
-    } else if (delta < -4) {
-      setIsHidden(false);
-    }
-  });
 
   const handleSectionClick = (sectionId: string) => (event: React.MouseEvent) => {
     event.preventDefault();
@@ -149,11 +98,7 @@ const Navbar = () => {
   };
 
   return (
-    <motion.header
-      style={{ background, boxShadow, backdropFilter: backdropBlur }}
-      animate={{ y: isHidden ? "-100%" : "0%" }}
-      transition={{ type: "spring", stiffness: 300, damping: 32 }}
-    >
+    <header>
       <nav className="flex items-center justify-between gap-4 px-4 py-4 text-sm">
         <Link
           to="/"
@@ -300,7 +245,7 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.header>
+    </header>
   );
 };
 

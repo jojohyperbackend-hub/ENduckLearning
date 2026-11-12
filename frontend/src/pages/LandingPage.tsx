@@ -5,12 +5,22 @@ import BenefitSection from "../components/landing/BenefitSection";
 import HeroSection from "../components/landing/HeroSection";
 import StepsSection from "../components/landing/StepsSection";
 import Button from "../components/common/Button";
+import Instagram from "../assets/instagram-logo-facebook-2-svgrepo-com.svg?react"
+import Github from "../assets/github-svgrepo-com.svg?react"
 
-const team = [
-  { name: "Ata", role: "Full stack, leader" },
-  { name: "Ali", role: "Backend" },
-  { name: "Anas", role: "Frontend" },
-  {name: "Gabe", role: " ui ux"},
+interface TeamMember {
+  name: string;
+  role: string;
+  github: string;    // username aja, tanpa link
+  instagram: string; // username aja, tanpa @
+  photo?: string;    // opsional, kalo ada dipake gantiin inisial
+}
+
+const team: TeamMember[] = [
+  { name: "Ata",  role: "Full stack, leader", github: "username-ata",  instagram: "username.ata" },
+  { name: "Ali",  role: "Backend",            github: "username-ali",  instagram: "username.ali" },
+  { name: "Anas", role: "Frontend",           github: "Anasfaiq",      instagram: "ansfqq08" },
+  { name: "Gabe", role: "UI/UX",              github: "username-gabe", instagram: "username.gabe" },
 ];
 
 const useInView = () => {
@@ -97,7 +107,7 @@ const StatsBar = () => {
 
 const TeamSection = () => {
   return (
-    <div className="grid gap-8 lg:grid-cols-[0.382fr_0.618fr] lg:gap-14">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
         <h2 className="font-heading text-heading font-bold leading-tight sm:text-4xl">
           Dibikin berempat
@@ -106,22 +116,65 @@ const TeamSection = () => {
           Proyek tim kami untuk LOGICODIX 2026.
         </p>
       </div>
-      <ul className="grid gap-6 sm:grid-cols-3">
+
+      <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-6">
         {team.map((member) => (
           <li
             key={member.name}
-            className="border-l-4 border-[var(--color-cta)] pl-4"
+            className="group flex flex-col items-start gap-4 rounded-2xl border-2 border-[var(--color-text)] bg-[var(--color-bg-card)] p-5 shadow-[4px_4px_0_var(--color-text)] transition-transform duration-200 hover:-translate-y-1 hover:shadow-[6px_6px_0_var(--color-text)]"
           >
-            <p className="font-heading text-3xl font-bold leading-none">
-              {member.name}
-            </p>
-            <p className="mt-2 text-body-lg">{member.role}</p>
+            {/* Avatar */}
+            {member.photo ? (
+              <img
+                src={member.photo}
+                alt={member.name}
+                className="size-16 rounded-full border-2 border-[var(--color-text)] object-cover"
+              />
+            ) : (
+              <div
+                aria-hidden="true"
+                className="flex size-16 items-center justify-center rounded-full border-2 border-[var(--color-text)] bg-[var(--color-cta)] font-heading text-2xl font-bold"
+              >
+                {member.name[0]}
+              </div>
+            )}
+
+            {/* Nama + role */}
+            <div>
+              <p className="font-heading text-2xl font-bold leading-none">
+                {member.name}
+              </p>
+              <p className="mt-2 text-body-lg">{member.role}</p>
+            </div>
+
+            {/* Sosmed */}
+            <div className="mt-auto flex gap-2">
+              <a
+                href={`https://github.com/${member.github}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`GitHub ${member.name}`}
+                className="flex size-9 items-center justify-center rounded-full border-2 border-[var(--color-text)] transition-colors hover:bg-[var(--color-text)] hover:text-[var(--color-bg)]"
+              >
+                <Github className="size-4" />
+              </a>
+              <a
+                href={`https://instagram.com/${member.instagram}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Instagram ${member.name}`}
+                className="flex size-9 items-center justify-center rounded-full border-2 border-[var(--color-text)] transition-colors hover:bg-[var(--color-cta)]"
+              >
+                <Instagram className="size-4" />
+              </a>
+            </div>
           </li>
         ))}
       </ul>
     </div>
   );
 };
+
 
 const FinalCtaSection = () => {
   return (

@@ -4,13 +4,13 @@ import Github from "./../../assets/github-svgrepo-com.svg?react";
 const socialLinks = [
   {
     name: "GitHub",
-    href: "https://github.com",
+    href: "https://github.com/jojohyperbackend-hub/ENduckLearning",
     icon: Github,
     iconClass: "[&_path]:stroke-current [&_path]:fill-none",
   },
   {
     name: "Discord",
-    href: "https://discord.com",
+    href: "https://discord.gg/gN2VRYYAb",
     icon: Discord,
     iconClass: "[&_path]:fill-current",
   },
