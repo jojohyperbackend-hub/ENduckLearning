@@ -15,7 +15,7 @@ from app.models.schemas import (
     LessonDetailOut,
 )
 from app.services.ai_service import generate_translate_feedback
-from app.services.milestone_service import check_and_award_badges
+# from app.services.milestone_service import check_and_award_badges
 from app.services.progress_service import (
     HEARTS_EMPTY_CODE,
     HeartsEmptyError,
@@ -116,6 +116,17 @@ def _xp_per_exercise(lesson_id: UUID) -> int:
     if jumlah_exercise <= 0:
         return 0
     return max(1, xp_reward_base // jumlah_exercise)
+
+# def _spend_start_xp(user_id: UUID) -> Dict[str, Any]:
+#     #bayar 10 xp saat memulai lesson. xp 0 tetap boleh mulai (gak jadi minus)
+#     progress_row = fetch_user_progress_row(user_id)
+#     current_xp = progress_row["total_xp"]
+#     cost = min(LESSON_START_XP_COST, current_xp)
+
+#     if cost <=0:
+#         return progress_row
+#     add_xp(user_id, -cost)
+#     return fetch_user_progress_row(user_id)
 
 
 def _fetch_exercise_row(exercise_id: UUID) -> Optional[Dict[str, Any]]:
@@ -353,12 +364,10 @@ def complete_lesson(lesson_id: UUID, user_id: UUID = Depends(get_current_user_id
         ).execute()
 
     update_current_lesson(user_id, _next_lesson_id(lesson_row))
-    badge_earned = check_and_award_badges(user_id)
     progress_row = fetch_user_progress_row(user_id)
 
     result = LessonCompleteResultOut(
         xp_earned_total=progress_row["total_xp"],
-        badge_earned=badge_earned,
         **heart_fields(progress_row),
     )
     return success_response(result)
