@@ -14,13 +14,19 @@ from app.models.schemas import (
     LessonCompleteResultOut,
     LessonDetailOut,
 )
+<<<<<<< HEAD
 from app.services.ai_service import generate_translate_feedback
 # from app.services.milestone_service import check_and_award_badges
+=======
+from app.services.grading_service import grade_short_answer, grade_translation
+from app.services.milestone_service import check_and_award_badges
+>>>>>>> 8e999ad4258e18f10cfd5287ac868e2377467d3e
 from app.services.progress_service import (
     HEARTS_EMPTY_CODE,
     HeartsEmptyError,
     add_xp,
     apply_heart_loss,
+    deduct_xp,
     fetch_user_progress_row,
     heart_fields,
     require_hearts,
@@ -33,6 +39,7 @@ router = APIRouter(tags=["lessons"])
 
 LESSON_TIDAK_DITEMUKAN = "Lesson tidak ditemukan"
 EXERCISE_TIDAK_DITEMUKAN = "Soal tidak ditemukan pada lesson ini"
+XP_PENALTY_WRONG_LESSON = 12
 LESSON_TERKUNCI = "Lesson ini masih terkunci, selesaikan lesson sebelumnya terlebih dahulu"
 
 
@@ -78,14 +85,23 @@ def _is_lesson_locked(user_id: UUID, lesson_row: Dict[str, Any]) -> bool:
     return not bool(completion_result.data)
 
 
+# Urutan soal di lesson: pilihan ganda dulu, lalu isian, terakhir terjemahan
+# (sama kayak urutan di bank soal). Dulu diurutin pakai exercise_id (UUID acak),
+# jadi urutan soalnya loncat-loncat.
+_TYPE_ORDER = {"multiple_choice": 0, "fill_blank": 1, "translate": 2}
+
+
 def _fetch_exercises_public(lesson_id: UUID) -> List[ExercisePublicOut]:
     client = get_service_client()
     result = (
         client.table("exercise")
-        .select("exercise_id, type, topic, question, options")
+        .select("exercise_id, lesson_id, type, topic, question, options")
         .eq("lesson_id", str(lesson_id))
-        .order("exercise_id")
         .execute()
+    )
+    rows = sorted(
+        (row for row in result.data if row.get("lesson_id") == str(lesson_id)),
+        key=lambda row: (_TYPE_ORDER.get(row["type"], len(_TYPE_ORDER)), row["exercise_id"]),
     )
     return [
         ExercisePublicOut(
@@ -95,7 +111,7 @@ def _fetch_exercises_public(lesson_id: UUID) -> List[ExercisePublicOut]:
             question=row["question"],
             options=row.get("options"),
         )
-        for row in result.data
+        for row in rows
     ]
 
 
@@ -190,12 +206,15 @@ def _finish_attempt(
         add_xp(user_id, xp_earned)
         progress_row = fetch_user_progress_row(user_id)
     else:
-        xp_earned = 0
+        # Salah di lesson: heart -1 DAN XP -12 (total XP gak bisa di bawah 0).
+        # Heart dikurangin dulu; kalau ternyata heart udah 0, XP gak ikut kepotong.
         _add_to_review_queue(user_id, UUID(exercise_row["exercise_id"]))
         try:
-            progress_row = apply_heart_loss(user_id)
+            apply_heart_loss(user_id)
         except HeartsEmptyError:
             return error_response(HEARTS_EMPTY_CODE)
+        xp_earned = -deduct_xp(user_id, XP_PENALTY_WRONG_LESSON)
+        progress_row = fetch_user_progress_row(user_id)
 
     result = AttemptResultOut(
         correct=is_correct,
@@ -243,8 +262,12 @@ def attempt_standard(
     except HeartsEmptyError:
         return error_response(HEARTS_EMPTY_CODE)
 
-    expected_answer = exercise_row["expected_answer"]
-    is_correct = payload.user_answer.strip().lower() == expected_answer.strip().lower()
+    is_correct = grade_short_answer(
+        exercise_row["type"],
+        exercise_row["question"],
+        payload.user_answer,
+        exercise_row["expected_answer"],
+    )
     return _finish_attempt(user_id, lesson_id, exercise_row, is_correct, None, None)
 
 
@@ -268,10 +291,10 @@ def attempt_translate(
     except RateLimitExceeded as exc:
         return error_response(exc.message)
 
-    feedback_result = generate_translate_feedback(
+    feedback_result = grade_translation(
+        question=exercise_row["question"],
         user_answer=payload.user_answer,
         expected_answer=exercise_row["expected_answer"],
-        question_text=exercise_row["question"],
     )
     return _finish_attempt(
         user_id,

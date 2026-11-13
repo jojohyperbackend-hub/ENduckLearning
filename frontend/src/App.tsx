@@ -19,6 +19,8 @@ import Footer from "./components/landing/Footer";
 import { useAuth } from "./hooks/useAuth";
 import LoadingSpinner from "./components/common/LoadingSpinner";
 import { FloatingWords } from "./components/common/FloatingWords";
+import CheatToast from "./components/common/CheatToast";
+import { useXpCheat } from "./hooks/useXpCheat";
 
 interface GuardProps {
   children: ReactNode;
@@ -103,6 +105,8 @@ const useSmoothScroll = () => {
 
 const AppLayout = () => {
   const location = useLocation();
+  const { status } = useAuth();
+  const cheatNotice = useXpCheat(status === "authenticated");
   const showOnLanding = location.pathname === "/";
   // Navbar tampil di landing dan halaman app. Login & lesson punya header sendiri.
   const showNavbar =
@@ -114,6 +118,7 @@ const AppLayout = () => {
 
   return (
     <div className="grid-bg relative isolate min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <CheatToast notice={cheatNotice} />
       {showFloatingWords && <FloatingWords />}
       {/* Sticky cuma di landing. Di halaman app navbar ikut scroll biar gak numpuk di atas kartu. */}
       <div className={showOnLanding ? "sticky top-0 z-50" : "relative z-50"}>

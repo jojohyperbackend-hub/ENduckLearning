@@ -50,7 +50,7 @@ const LessonFlow = ({ lesson, hearts, submitAnswer, finish }: LessonFlowProps) =
       items={lesson.exercises}
       initialHearts={hearts}
       exitLabel="Keluar dari lesson"
-      wrongHint="Soal ini masuk Review supaya bisa kamu ulang nanti."
+      wrongHint="Heart −1. Soal ini masuk Review supaya bisa kamu ulang nanti."
       finishLabel="Selesaikan lesson"
       submit={submitAnswer}
       finish={handleFinish}

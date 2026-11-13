@@ -127,6 +127,11 @@ export interface QuizFormOptions extends HeartState {
   // Gerbang 1: minimal 1 lesson pernah selesai
   gate1_passed: boolean;
   gate1_message: string | null;
+  // Syarat minimal XP buat buka Latihan AI (dicek setelah Gerbang 1)
+  xp_required: number;
+  total_xp: number;
+  xp_gate_passed: boolean;
+  xp_gate_message: string | null;
   // Topik manual, cuma dari unit yang sudah terbuka
   available_topics: string[];
   tipe_soal_options: QuizTypeOption[];
