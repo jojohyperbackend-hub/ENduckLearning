@@ -72,7 +72,7 @@ const ProfilePage = () => {
           <p className="mt-2 font-heading text-lg font-bold leading-tight text-[#1c2b4a]">
             {lessonDone}/{lessonTotal || 0}
           </p>
-          <p className="text-xs font-semibold text-[#1c2b4a]/60">Lesson</p>
+          <p className="text-xs font-semibold text-[#1c2b4a]/60">Pelajaran</p>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ const ProfilePage = () => {
       <div className="flex flex-col gap-4 rounded-3xl bg-white p-5 shadow-[0_8px_16px_rgba(0,0,0,0.03)]">
         <div className="flex items-center justify-between">
           <h2 className="font-heading text-base font-bold text-[#1c2b4a]">
-            Review Kesalahan ({reviewItems.length})
+            Lihat Kesalahan ({reviewItems.length})
           </h2>
           <span className="inline-flex items-center justify-center rounded-full bg-[#FFD1D6] px-3 py-1 text-center text-xs font-bold text-[#D84556]">
             Perlu diulang
@@ -115,7 +115,7 @@ const ProfilePage = () => {
           disabled={reviewItems.length === 0}
           className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#283c63] py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#1c2b4a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Review <ArrowRight size={18} />
+          Lihat <ArrowRight size={18} />
         </button>
       </div>
 
@@ -125,7 +125,7 @@ const ProfilePage = () => {
           onClick={() => void logout()}
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#F56A79] py-3.5 text-lg font-bold text-[#1c2b4a] shadow-sm transition active:scale-[0.98]"
         >
-          Logout <LogOut size={22} strokeWidth={2.5} />
+          Keluar <LogOut size={22} strokeWidth={2.5} />
         </button>
       </div>
     </section>

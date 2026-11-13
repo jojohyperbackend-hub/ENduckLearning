@@ -197,13 +197,13 @@ const LoginPage = () => {
                   >
                     <h1 className="font-heading text-4xl font-extrabold leading-[1.05] text-[var(--color-text)] md:text-5xl">
                       {isRegister
-                        ? "Create your account"
-                        : "Login to your account"}
+                        ? "Buat akun anda"
+                        : "Masuk akun anda"}
                     </h1>
                     <p className="mt-4 max-w-sm font-heading text-base font-semibold leading-snug text-[var(--color-text)]">
                       {isRegister
-                        ? "Join us for free and became better at english!"
-                        : "Welcome back to Grammarise! looks like someone decide to be better at english, huh?"}
+                        ? "Yuk, gabung gratis dan tingkatkan kemampuan bahasa Inggrismu!"
+                        : "Selamat datang kembali di Grammarise! Kelihatannya ada yang lagi semangat belajar bahasa Inggris, nih!"}
                     </p>
                   </motion.div>
                 </AnimatePresence>
@@ -306,21 +306,21 @@ const LoginPage = () => {
                   type="submit"
                   fullwidth
                   isLoading={isSubmitting}
-                  loadingText="Please wait..."
+                  loadingText="Mohon tunggu..."
                   disabled={isSubmitting || isGoogleLoading}
                 >
-                  {isRegister ? "Sign Up" : "Login"}
+                  {isRegister ? "Daftar" : "Masuk"}
                 </Button>
 
                 <p className="text-center text-caption text-[var(--color-text)]/70">
-                  Or use
+                  Atau masuk dengan
                 </p>
 
                 <Button
                   type="button"
                   fullwidth
                   isLoading={isGoogleLoading}
-                  loadingText="Please wait..."
+                  loadingText="Mohon tunggu..."
                   disabled={isSubmitting || isGoogleLoading}
                   onClick={handleGoogle}
                 >
@@ -335,14 +335,14 @@ const LoginPage = () => {
                 variants={fadeUp}
                 className="text-center text-body-sm text-[var(--color-text)]/75"
               >
-                {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
+                {isRegister ? "Sudah memiliki akun?" : "Belum memiliki akun?"}{" "}
                 <button
                   type="button"
                   onClick={() => switchMode(isRegister ? "login" : "register")}
                   disabled={isSubmitting || isGoogleLoading}
                   className="font-semibold text-[var(--color-text)] underline underline-offset-4"
                 >
-                  {isRegister ? "Sign in" : "Sign up"}
+                  {isRegister ? "Masuk" : "Daftar"}
                 </button>
               </motion.p>
             </motion.form>

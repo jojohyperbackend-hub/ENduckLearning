@@ -72,7 +72,7 @@ const ProgressContent = ({
           </p>
           <div className="mt-auto">
             <div className="mb-2 flex items-center justify-between text-body">
-              <span>Lesson selesai</span>
+              <span>Pelajaran selesai</span>
               <span className="font-semibold">
                 {units === null ? "belum bisa dimuat" : `${doneLessons} dari ${totalLessons}`}
               </span>
@@ -82,7 +82,7 @@ const ProgressContent = ({
                 <ProgressSegments
                   done={doneLessons}
                   total={totalLessons}
-                  label={`${doneLessons} dari ${totalLessons} lesson selesai`}
+                  label={`${doneLessons} dari ${totalLessons} pelajaran selesai`}
                 />
               </div>
             )}

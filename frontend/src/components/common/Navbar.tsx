@@ -20,8 +20,8 @@ const LANDING_SECTIONS = [
 // Nav buat halaman aplikasi (setelah login)
 const APP_LINKS = [
   { to: "/dashboard", label: "Dashboard" },
-  { to: "/progress", label: "Progress" },
-  { to: "/quiz/generate", label: "Quiz AI", match: "/quiz" },
+  { to: "/progress", label: "Progres" },
+  { to: "/quiz/generate", label: "Kuis AI", match: "/quiz" },
 ];
 
 const HeaderStatsReady = ({ data }: { data: DashboardData }) => {
@@ -241,7 +241,7 @@ const Navbar = () => {
             to="/login"
             className="hidden rounded-xl bg-[var(--color-cta)] px-7 py-2 text-body-lg text-[var(--color-text)] transition hover:scale-[1.03] active:scale-[0.98] hover:bg-[var(--color-cta-soft)] shadow-[0_4px_0_rgba(40,60,99,0.8)] motion-reduce:hover:scale-100 md:inline-flex"
           >
-            Login
+            Masuk
           </Link>
         )}
 
@@ -323,7 +323,7 @@ const Navbar = () => {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="mt-1 rounded-xl bg-[var(--color-cta)] px-4 py-3 text-center text-base font-semibold text-[var(--color-text)] shadow-[0_4px_0_rgba(40,60,99,0.8)] transition active:scale-[0.98]"
                 >
-                  Login
+                  Masuk
                 </Link>
               )}
             </div>

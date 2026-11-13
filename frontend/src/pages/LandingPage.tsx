@@ -7,6 +7,10 @@ import StepsSection from "../components/landing/StepsSection";
 import Button from "../components/common/Button";
 import Instagram from "../assets/instagram-logo-facebook-2-svgrepo-com.svg?react"
 import Github from "../assets/github-svgrepo-com.svg?react"
+import ali from "../assets/ali.jpeg"
+import anas from "../assets/anas.jpg"
+import ata from "../assets/ata.jpeg"
+import gabe from "../assets/gabe.jpg"
 
 interface TeamMember {
   name: string;
@@ -17,10 +21,10 @@ interface TeamMember {
 }
 
 const team: TeamMember[] = [
-  { name: "Ata",  role: "Full stack, leader", github: "username-ata",  instagram: "username.ata" },
-  { name: "Ali",  role: "Backend",            github: "username-ali",  instagram: "username.ali" },
-  { name: "Anas", role: "Frontend",           github: "Anasfaiq",      instagram: "ansfqq08" },
-  { name: "Gabe", role: "UI/UX",              github: "username-gabe", instagram: "username.gabe" },
+  { name: "Ata",  role: "Full stack, leader", github: "jojohyperbackend-hub",  instagram: "joustarfallen", photo: ata },
+  { name: "Ali",  role: "Backend",            github: "KuchAli",  instagram: "khrli08", photo: ali },
+  { name: "Anas", role: "Frontend",           github: "Anasfaiq",      instagram: "ansfqq08", photo: anas },
+  { name: "Gabe", role: "UI/UX",              github: "Gabeverse-ai", instagram: "gabe_nov29", photo: gabe},
 ];
 
 const useInView = () => {

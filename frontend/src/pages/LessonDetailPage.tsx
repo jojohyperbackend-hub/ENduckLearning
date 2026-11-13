@@ -158,7 +158,7 @@ const LessonNode = ({
           className="absolute bottom-full left-1/2 mb-3 w-40 -translate-x-1/2 rounded-2xl bg-[var(--color-bg-card)] p-3 text-center text-[var(--color-text)] shadow-[0_8px_20px_rgba(40,60,99,0.25)]"
         >
           <p className="font-heading text-lg font-bold leading-tight">
-            Lesson {lesson.number}
+            Pelajaran {lesson.number}
           </p>
           <p className="text-body-sm opacity-70">+{lesson.xp_reward_base} XP</p>
           <button
@@ -455,7 +455,7 @@ const LessonRoadmap = ({ data }: { data: DashboardData }) => {
       {units.length === 0 ? (
         <Card className="mx-auto mt-8 max-w-sm p-6">
           <p className="font-heading text-card-header font-bold">
-            Belum ada lesson
+            Belum ada pelajaran
           </p>
           <p className="mt-1 text-body-lg">
             Materinya lagi disiapin. Cek lagi nanti ya.
@@ -512,7 +512,7 @@ const LessonDetailPage = () => {
       <section className="py-10">
         <Card className="mx-auto flex max-w-xl flex-col items-start gap-4 p-6 sm:p-8">
           <h1 className="font-heading text-heading font-bold">
-            Lesson gagal dimuat
+            Pelajaran gagal dimuat
           </h1>
           <p className="text-body-lg">{state.message}</p>
           <Button onClick={retry}>Coba lagi</Button>

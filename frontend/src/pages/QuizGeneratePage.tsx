@@ -44,7 +44,7 @@ const PageHeader = ({ showRules }: { showRules: boolean }) => (
         Latihan AI
       </h1>
       <p className="mt-3 max-w-[46ch] font-heading text-card-header font-semibold sm:text-2xl">
-        Soal baru buatan AI dari topik yang sudah kamu pelajari, beda dari soal lesson.
+        Soal baru buatan AI dari topik yang sudah kamu pelajari, beda dari soal pelajaran.
       </p>
     </div>
     {showRules && <XpRules />}
@@ -60,7 +60,7 @@ const XpRules = () => (
         Benar <span className="font-bold">+{AI_XP_CORRECT} XP</span>
       </p>
       <p>
-        Salah <span className="font-bold">&minus;{AI_XP_WRONG} XP</span>, heart aman
+        Salah <span className="font-bold">&minus;{AI_XP_WRONG} XP</span>
       </p>
     </div>
   </div>
@@ -83,7 +83,7 @@ const LockedCard = ({ reason, message }: { reason: AiPracticeLockReason; message
       to="/dashboard"
       className="inline-flex items-center rounded-full border border-[var(--color-text)]/70 bg-[var(--color-cta)] px-6 py-3 text-body-lg font-bold shadow-[0_4px_0_rgba(40,60,99,0.8)] transition hover:bg-[var(--color-cta-soft)] active:translate-y-0.5"
     >
-      Ke lesson berikutnya
+      Ke pelajaran berikutnya
     </Link>
   </Card>
 );

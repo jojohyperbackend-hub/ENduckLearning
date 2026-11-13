@@ -54,7 +54,7 @@ export const useLesson = (lessonId: string | undefined) => {
   );
 
   const finish = useCallback(async (): Promise<LessonCompleteResult> => {
-    if (!lessonId) throw new Error("Lesson tidak ditemukan");
+    if (!lessonId) throw new Error("Pelajaran tidak ditemukan");
     return completeLesson(lessonId);
   }, [lessonId]);
 

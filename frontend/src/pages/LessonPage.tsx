@@ -37,10 +37,10 @@ const LessonFlow = ({ lesson, hearts, submitAnswer, finish }: LessonFlowProps) =
         message={
           isPerfect
             ? "Semua jawabanmu benar. Lanjut ke lesson berikutnya selagi lagi lancar."
-            : `${summary.wrong} soal yang salah masuk ke Review, jadi bisa diulang kapan saja.`
+            : `${summary.wrong} soal yang salah masuk ke Lihat Kesalahan, jadi bisa diulang kapan saja.`
         }
-        onFinish={() => navigate("/dashboard")}
-        secondary={summary.wrong > 0 ? { label: "Buka Review", to: "/progress#review" } : null}
+        onFinish={() => navigate("/lessons")}
+        secondary={summary.wrong > 0 ? { label: "Buka Tinjauan", to: "/progress#review" } : null}
       />
     );
   }
@@ -49,9 +49,9 @@ const LessonFlow = ({ lesson, hearts, submitAnswer, finish }: LessonFlowProps) =
     <QuestionRunner
       items={lesson.exercises}
       initialHearts={hearts}
-      exitLabel="Keluar dari lesson"
+      exitLabel="Keluar dari pelajaran"
       wrongHint="Heart −1. Soal ini masuk Review supaya bisa kamu ulang nanti."
-      finishLabel="Selesaikan lesson"
+      finishLabel="Selesaikan pelajaran"
       submit={submitAnswer}
       finish={handleFinish}
     />
@@ -62,7 +62,7 @@ const LessonSkeleton = () => (
   <section
     className="mx-auto flex w-full max-w-2xl flex-col gap-5 py-8"
     role="status"
-    aria-label="Memuat lesson"
+    aria-label="Memuat Pelajaran"
   >
     <div className="skeleton h-10 rounded-full bg-[var(--color-text)]/10" />
     <div className="skeleton h-80 rounded-2xl bg-[var(--color-bg-card)]" />
@@ -109,8 +109,8 @@ const LessonPage = () => {
     const isLocked = error?.toLowerCase().includes("terkunci");
     return (
       <LessonMessage
-        title={isLocked ? "Lesson masih terkunci" : "Lesson gagal dimuat"}
-        message={error ?? "Lesson tidak ditemukan."}
+        title={isLocked ? "Pelajaran masih terkunci" : "Pelajaran gagal dimuat"}
+        message={error ?? "Pelajaran tidak ditemukan."}
         canReload={!isLocked}
       />
     );
@@ -119,7 +119,7 @@ const LessonPage = () => {
   if (lesson.exercises.length === 0) {
     return (
       <LessonMessage
-        title="Lesson ini belum punya soal"
+        title="pelajaran ini belum punya soal"
         message="Soalnya belum disiapin. Coba lesson lain dulu, atau cek lagi nanti."
       />
     );

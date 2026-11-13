@@ -28,10 +28,10 @@ const Footer = () => {
             Learn English, Grow. Belajar Bahasa Inggris pelan-pelan, gratis.
           </p>
           <a
-            href="mailto:gramarise@gmail.com"
+            href="mailto:gramarise.edu@gmail.com"
             className="mt-2 w-fit break-all text-body-lg underline decoration-[var(--color-bg-card)]/40 underline-offset-4 hover:decoration-[var(--color-bg-card)]"
           >
-            gramarise@gmail.com
+            gramarise.edu@gmail.com
           </a>
         </div>
 

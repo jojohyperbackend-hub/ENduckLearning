@@ -161,15 +161,15 @@ const ContinueCard = ({
 
       <p className="font-heading text-3xl font-extrabold leading-none sm:text-4xl">
         {nextLesson
-          ? `Unit ${focusUnit.number}, Lesson ${nextLesson.number}`
-          : "Semua lesson selesai"}
+          ? `Unit ${focusUnit.number}, Pelajaran ${nextLesson.number}`
+          : "Semua pelajaran selesai"}
       </p>
 
       <div>
         <div className="mb-1.5 flex items-center justify-between text-body-sm">
           <span>Progres unit ini</span>
           <span className="font-semibold">
-            {focusUnit.doneCount} dari {total} lesson
+            {focusUnit.doneCount} dari {total} pelajaran
           </span>
         </div>
         <LessonSegments lessons={focusUnit.lessons} className="max-w-xl" />
@@ -178,15 +178,15 @@ const ContinueCard = ({
       <p className="text-body">
         {nextLesson
           ? remaining === 1
-            ? "Satu lesson lagi, matahari unit ini terbit."
-            : `${remaining} lesson lagi sampai matahari unit ini terbit.`
+            ? "Satu pelajaran lagi, matahari unit ini terbit."
+            : `${remaining} pelajaran lagi sampai matahari unit ini terbit.`
           : "Mau tetap latihan? Minta soal baru di Latihan AI."}
       </p>
 
       {nextLesson && (
         /* di HP tombolnya pindah ke bar bawah yang nempel */
         <div className="hidden md:block">
-          <Button onClick={onStart}>Mulai Lesson {nextLesson.number}</Button>
+          <Button onClick={onStart}>Mulai Pelajaran {nextLesson.number}</Button>
         </div>
       )}
     </Card>
@@ -231,7 +231,7 @@ const ReviewCard = ({ reviewCount }: { reviewCount: number | null }) => {
           ? "Review"
           : reviewCount === 0
             ? "Review kosong"
-            : `${reviewCount} soal di Review`}
+            : `${reviewCount} soal di Tinjau`}
       </p>
 
       <p className="text-body text-[var(--color-bg-card)]/85">
@@ -246,7 +246,7 @@ const ReviewCard = ({ reviewCount }: { reviewCount: number | null }) => {
           to="/progress#review"
           className="w-fit text-body font-bold underline decoration-2 underline-offset-4 transition hover:text-[var(--color-cta)]"
         >
-          Kerjakan Review
+          Kerjakan hasil Tinjau
         </Link>
       )}
 
@@ -258,7 +258,7 @@ const ReviewCard = ({ reviewCount }: { reviewCount: number | null }) => {
             </p>
             <p className="text-body text-[var(--color-bg-card)]/85">
               Soal baru dari topik yang udah kamu pelajari. Butuh minimal {AI_MIN_XP} XP. Benar
-              +{AI_XP_CORRECT} XP, salah &minus;{AI_XP_WRONG} XP, heart aman.
+              +{AI_XP_CORRECT} XP, salah &minus;{AI_XP_WRONG} XP.
             </p>
           </div>
           <button
@@ -324,7 +324,7 @@ const FocusUnitDesktop = ({
           {unit.title}
         </h3>
         <p className="mt-1 text-body text-[var(--color-bg-card)]/85">
-          {unit.doneCount} dari {unit.lessons.length} lesson selesai
+          {unit.doneCount} dari {unit.lessons.length} pelajaran selesai
         </p>
       </div>
     </div>
@@ -434,7 +434,7 @@ const DashboardContent = ({ data }: { data: DashboardData }) => {
             Selamat datang
           </h1>
           <p className="mt-3 max-w-[44ch] font-heading text-card-header font-semibold sm:text-2xl">
-            Satu lesson singkat lagi, satu langkah lebih percaya diri.
+            Satu pelajaran singkat lagi, satu langkah lebih percaya diri.
           </p>
         </div>
         <StatusStrip data={data} clock={clock} />
@@ -457,7 +457,7 @@ const DashboardContent = ({ data }: { data: DashboardData }) => {
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-heading text-4xl font-extrabold leading-none">
-            Lesson
+            Pelajaran
           </h2>
           {data.courseTitle && (
             <p className="text-body-lg">{data.courseTitle}</p>
@@ -467,7 +467,7 @@ const DashboardContent = ({ data }: { data: DashboardData }) => {
         {units.length === 0 ? (
           <Card className="p-6 sm:p-8">
             <p className="font-heading text-card-header font-bold">
-              Belum ada lesson
+              Belum ada pelajaran
             </p>
             <p className="mt-1 text-body-lg">
               Materinya lagi disiapin. Cek lagi nanti, atau coba Latihan AI
