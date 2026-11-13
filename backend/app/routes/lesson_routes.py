@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 from uuid import UUID
-import re
+
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -15,7 +15,7 @@ from app.models.schemas import (
     LessonCompleteResultOut,
     LessonDetailOut,
 )
-from app.services.ai_service import generate_translate_feedback
+# from app.services.ai_service import generate_translate_feedback
 # from app.services.milestone_service import check_and_award_badges
 from app.services.progress_service import (
     HEARTS_EMPTY_CODE,
@@ -30,6 +30,7 @@ from app.services.progress_service import (
 )
 from app.utils.cache import RateLimitExceeded, check_translate_attempt_rate_limit
 from app.utils.helpers import error_response, success_response, utcnow
+from app.services.grading_service import grade_short_answer, grade_translation
 
 router = APIRouter(tags=["lessons"])
 
@@ -140,18 +141,15 @@ def _xp_per_exercise(lesson_id: UUID) -> int:
 #     add_xp(user_id, -cost)
 #     return fetch_user_progress_row(user_id)
 
-def _normalize_answer(text: str) -> str:
-    text = (text or "").strip().lower()
-    text = re.sub(r"[^\w\s]", "", text)
-    return re.sub(r"\s+", " ", text)
 
-def grade_short_answer(
-    exercise_type: str,
-    question: str,
-    user_answer: str,
-    expected_answer: str,
-) -> bool:
-    return _normalize_answer(user_answer) == _normalize_answer(expected_answer)
+
+# def grade_short_answer(
+#     exercise_type: str,
+#     question: str,
+#     user_answer: str,
+#     expected_answer: str,
+# ) -> bool:
+#     return _normalize_answer(user_answer) == _normalize_answer(expected_answer)
 
 
 def _fetch_exercise_row(exercise_id: UUID) -> Optional[Dict[str, Any]]:
@@ -300,7 +298,7 @@ def attempt_translate(
     except RateLimitExceeded as exc:
         return error_response(exc.message)
 
-    feedback_result = generate_translate_feedback(
+    feedback_result = grade_translation(
         question=exercise_row["question"],
         user_answer=payload.user_answer,
         expected_answer=exercise_row["expected_answer"],
