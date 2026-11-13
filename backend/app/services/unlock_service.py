@@ -139,8 +139,20 @@ def get_unlocked_topics(user_id: UUID) -> List[str]:
     client = get_service_client()
     result = (
         client.table("exercise")
-        .select("topic")
+        .select("lesson_id, topic")
         .in_("lesson_id", unlocked_lesson_ids)
         .execute()
     )
-    return sorted({row["topic"] for row in result.data if row.get("topic")})
+    topics_by_lesson: Dict[str, List[str]] = {}
+    for row in result.data:
+        if row.get("topic"):
+            topics_by_lesson.setdefault(row["lesson_id"], []).append(row["topic"])
+
+    # Urut sesuai kurikulum (unit 1 lesson 1, unit 1 lesson 2, ...), bukan abjad,
+    # biar topik dari unit yang beda gak kecampur di dropdown.
+    ordered_topics: List[str] = []
+    for lesson_id in unlocked_lesson_ids:
+        for topic in topics_by_lesson.get(lesson_id, []):
+            if topic not in ordered_topics:
+                ordered_topics.append(topic)
+    return ordered_topics

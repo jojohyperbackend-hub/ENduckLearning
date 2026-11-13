@@ -29,7 +29,9 @@ const FeedbackNote = ({ result, wrongHint }: FeedbackNoteProps) => {
             ? result.xp_earned > 0
               ? `Benar, +${result.xp_earned} XP`
               : "Benar"
-            : "Belum tepat"}
+            : result.xp_earned < 0
+              ? `Belum tepat, −${Math.abs(result.xp_earned)} XP`
+              : "Belum tepat"}
         </p>
         {result.feedback && (
           <p className="mt-1 text-body text-[var(--color-text)]">{result.feedback}</p>

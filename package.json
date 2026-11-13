@@ -1,1 +1,16 @@
-{}
+{
+  "name": "englishducailms",
+  "private": true,
+  "description": "Grammarise: jalanin backend (FastAPI) dan frontend (Vite) dari folder root.",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names backend,frontend --prefix-colors blue,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "node scripts/run-backend.cjs",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "setup": "npm install && npm --prefix frontend install && node scripts/run-backend.cjs --install",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

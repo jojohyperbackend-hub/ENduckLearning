@@ -21,7 +21,7 @@ import {
   type HeartSnapshot,
 } from "../hooks/useHeartClock";
 import { getErrorMessage } from "../api/client";
-import { checkAiPracticeAccess } from "../utils/aiPracticeAccess";
+import { AI_MIN_XP, AI_XP_CORRECT, AI_XP_WRONG, checkAiPracticeAccess } from "../utils/aiPracticeAccess";
 
 const MAX_HEARTS = 5;
 const DESKTOP_QUERY = "(min-width: 768px)";
@@ -163,17 +163,11 @@ type AiLaunchState =
   | { status: "locked"; message: string }
   | { status: "error"; message: string };
 
-const ReviewCard = ({
-  reviewCount,
-  onHeartsEmpty,
-}: {
-  reviewCount: number | null;
-  onHeartsEmpty: (hearts: HeartSnapshot) => void;
-}) => {
+const ReviewCard = ({ reviewCount }: { reviewCount: number | null }) => {
   const navigate = useNavigate();
   const [launch, setLaunch] = useState<AiLaunchState>({ status: "idle" });
 
-  // Tombol selalu kelihatan. Yang dicek isinya: Gerbang 1 dulu, lalu heart.
+  // Tombol selalu kelihatan. Yang dicek cuma Gerbang 1; Latihan AI gak pakai heart.
   const openAiPractice = async () => {
     if (launch.status === "checking") return;
     setLaunch({ status: "checking" });
@@ -181,9 +175,6 @@ const ReviewCard = ({
       const access = await checkAiPracticeAccess();
       if (access.status === "locked") {
         setLaunch({ status: "locked", message: access.message });
-      } else if (access.status === "no-hearts") {
-        setLaunch({ status: "idle" });
-        onHeartsEmpty(access.hearts);
       } else {
         navigate("/quiz/generate");
       }
@@ -228,7 +219,8 @@ const ReviewCard = ({
           <div>
             <p className="font-heading text-card-header font-bold">Latihan AI</p>
             <p className="text-body text-[var(--color-bg-card)]/85">
-              Soal baru buat topik yang masih sering salah.
+              Soal baru dari topik yang udah kamu pelajari. Butuh minimal {AI_MIN_XP} XP. Benar
+              +{AI_XP_CORRECT} XP, salah &minus;{AI_XP_WRONG} XP, heart aman.
             </p>
           </div>
           <button
@@ -400,7 +392,7 @@ const DashboardContent = ({ data }: { data: DashboardData }) => {
         {focusUnit && (
           <ContinueCard data={data} onStart={() => nextLesson && openLesson(nextLesson.lesson_id)} />
         )}
-        <ReviewCard reviewCount={data.reviewCount} onHeartsEmpty={setHeartsModal} />
+        <ReviewCard reviewCount={data.reviewCount} />
       </div>
 
       <div className="flex flex-col gap-4">

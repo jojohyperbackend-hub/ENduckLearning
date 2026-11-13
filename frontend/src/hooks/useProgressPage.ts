@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getErrorMessage } from "../api/client";
 import { getCourses, getUnits } from "../api/lessonApi";
 import { getMyProgress, getReviewQueue } from "../api/progressApi";
+import { onProgressChanged } from "../utils/progressEvents";
 import { toHeartSnapshot, type HeartSnapshot } from "./useHeartClock";
 import type { Progress, ReviewQueueItem, UnitWithLessons } from "../types";
 
@@ -48,6 +49,19 @@ const loadProgressPage = async (): Promise<ProgressPageData> => {
 export const useProgressPage = () => {
   const [state, setState] = useState<ProgressPageState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
+
+  // Progress berubah dari luar halaman (misal cheat XP): angka XP & badge langsung ikut.
+  useEffect(
+    () =>
+      onProgressChanged((progress) =>
+        setState((previous) =>
+          previous.status === "ready"
+            ? { status: "ready", data: { ...previous.data, progress } }
+            : previous,
+        ),
+      ),
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;

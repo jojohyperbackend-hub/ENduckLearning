@@ -10,9 +10,15 @@ from app.utils.helpers import utcnow
 HEARTS_MIN = 0
 HEARTS_MAX = 5
 
-# 1 heart balik 4 menit setelah heart itu hilang. Dihitung pakai jam server (UTC),
-# jadi tetap jalan walau app ditutup dan gak bisa dicurangi dengan ubah jam device.
-HEART_REGEN_SECONDS = 240
+# Heart balik satu-satu, ngantre berurutan:
+# - heart pertama di antrean balik 18 menit setelah hilang,
+# - tiap heart berikutnya balik 7 menit setelah heart sebelumnya balik.
+# Kurang 1 heart = 18 menit. Habis semua (5 heart) = 18 + 4 x 7 = 46 menit sampai penuh.
+# Contoh: salah 18:00 -> balik 18:18. Salah lagi 18:00:20 -> balik 18:25 (bukan 18:18:20).
+# Dihitung pakai jam server (UTC), tetap jalan walau app ditutup dan gak bisa dicurangi
+# dengan ubah jam device.
+HEART_FIRST_REGEN_SECONDS = 18 * 60
+HEART_NEXT_REGEN_SECONDS = 7 * 60
 
 HEARTS_EMPTY_CODE = "HEARTS_EMPTY"
 
@@ -46,6 +52,18 @@ def _serialize_timestamps(timestamps: List[datetime]) -> List[str]:
     return [timestamp.astimezone(timezone.utc).isoformat() for timestamp in timestamps]
 
 
+def _next_regen_slot(pending: List[datetime], now: datetime) -> datetime:
+    """Jadwal balik heart yang baru hilang.
+
+    Antrean kosong (semua heart lain udah balik) -> 18 menit dari sekarang.
+    Masih ada heart yang nunggu -> 7 menit setelah heart terakhir di antrean balik.
+    """
+    waiting = [timestamp for timestamp in pending if timestamp > now]
+    if not waiting:
+        return now + timedelta(seconds=HEART_FIRST_REGEN_SECONDS)
+    return max(waiting) + timedelta(seconds=HEART_NEXT_REGEN_SECONDS)
+
+
 def _clamp_hearts(value: Any) -> int:
     try:
         hearts = int(value)
@@ -57,7 +75,8 @@ def _clamp_hearts(value: Any) -> int:
 def _settle_hearts(row: Dict[str, Any], now: datetime) -> Dict[str, Any]:
     """Tambahin heart yang waktunya sudah lewat, rapihin antrean waktu regenerasi.
 
-    Tiap heart yang hilang punya jadwal balik sendiri-sendiri (heart_regen_timestamps).
+    heart_regen_timestamps = antrean jam balik tiap heart yang hilang, berurutan
+    dengan jarak minimal 7 menit satu sama lain.
     Return dict berisi hearts & pending terbaru plus flag changed kalau perlu disimpan.
     """
     original_hearts = row.get("hearts_remaining")
@@ -70,12 +89,19 @@ def _settle_hearts(row: Dict[str, Any], now: datetime) -> Dict[str, Any]:
         timestamp for timestamp in (_parse_timestamp(item) for item in raw_pending) if timestamp
     )
 
+    # Antrean dari versi lama (jarak 4 menit atau paralel) dirapihin:
+    # tiap jadwal minimal 7 menit setelah jadwal sebelumnya.
+    for position in range(1, len(pending)):
+        earliest = pending[position - 1] + timedelta(seconds=HEART_NEXT_REGEN_SECONDS)
+        if pending[position] < earliest:
+            pending[position] = earliest
+
     # Data lama (sebelum ada kolom regenerasi): heart yang kurang tanpa jadwal
-    # dianggap baru hilang sekarang.
+    # dianggap baru hilang sekarang, masuk antrean paling belakang.
     missing = HEARTS_MAX - hearts - len(pending)
     if missing > 0:
-        pending.extend([now + timedelta(seconds=HEART_REGEN_SECONDS)] * missing)
-        pending.sort()
+        for _ in range(missing):
+            pending.append(_next_regen_slot(pending, now))
     elif missing < 0:
         pending = pending[: HEARTS_MAX - hearts]
 
@@ -217,8 +243,22 @@ def add_xp(user_id: UUID, xp_amount: int) -> int:
     return new_total_xp
 
 
+def deduct_xp(user_id: UUID, xp_amount: int) -> int:
+    """Potong XP, total gak pernah di bawah 0. Return jumlah XP yang beneran kepotong."""
+    client = get_service_client()
+    progress_row = fetch_user_progress_row(user_id)
+    current_xp = max(0, int(progress_row["total_xp"]))
+    deducted = min(current_xp, max(0, xp_amount))
+    if deducted:
+        client.table("user_progress").update({"total_xp": current_xp - deducted}).eq(
+            "user_id", str(user_id)
+        ).execute()
+    return deducted
+
+
 def apply_heart_loss(user_id: UUID) -> Dict[str, Any]:
-    """Kurangi 1 heart dan jadwalkan heart itu balik 4 menit dari sekarang.
+    """Kurangi 1 heart dan taruh di antrean balik: 7 menit setelah heart terakhir
+    di antrean balik, atau 18 menit dari sekarang kalau antrean kosong.
 
     Update cuma jalan kalau jumlah heart di database masih sama dengan yang dibaca,
     jadi 2 tab yang jawab barengan gak bisa bikin heart minus.
@@ -232,15 +272,14 @@ def apply_heart_loss(user_id: UUID) -> Dict[str, Any]:
             raise HeartsEmptyError()
 
         now = utcnow()
-        new_hearts = current_hearts - 1
-
-        #hitung berapa total heart yang sedang kosong
-        missing_count = HEARTS_MAX - new_hearts
-        pending = [
-            now + timedelta(seconds=HEART_REGEN_SECONDS * (i + 1))
-            for i in range(missing_count)
-        ]
+        pending = sorted(
+            timestamp
+            for timestamp in (_parse_timestamp(item) for item in row["heart_regen_timestamps"])
+            if timestamp
+        )
+        pending.append(_next_regen_slot(pending, now))
         serialized = _serialize_timestamps(pending)
+        new_hearts = current_hearts - 1
 
         result = (
             client.table("user_progress")

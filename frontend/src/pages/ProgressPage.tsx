@@ -125,7 +125,7 @@ const ProgressContent = ({
             </div>
             <p className="text-body">
               {hearts === MAX_HEARTS || clock.nextIn === null
-                ? "Heart penuh. Jawaban salah ngurangin 1 heart, dan heart itu balik 4 menit kemudian."
+                ? "Heart penuh. Salah jawab di lesson ngurangin 1 heart dan 12 XP. Heart pertama balik 18 menit kemudian, berikutnya tiap 7 menit."
                 : `${hearts} heart tersisa. Heart berikutnya balik dalam ${formatCountdown(clock.nextIn)}.`}
             </p>
           </div>

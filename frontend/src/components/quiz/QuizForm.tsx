@@ -4,9 +4,8 @@ import Button from "../common/Button";
 import Card from "../common/Card";
 import ChoiceGroup, { type Choice } from "./ChoiceGroup";
 import { topicLabel } from "../../utils/formatters";
+import { AI_XP_CORRECT, AI_XP_WRONG } from "../../utils/aiPracticeAccess";
 import type { DifficultyOption, QuizFormRequest, QuizTypeOption } from "../../types";
-
-const XP_PER_SOAL = 10;
 
 type FocusMode = "auto" | "manual";
 
@@ -131,8 +130,8 @@ const QuizForm = ({ topics, isSubmitting, error, initial, onSubmit }: QuizFormPr
 
         <div className="flex flex-col gap-3 border-t-2 border-[var(--color-text)]/15 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-body-lg">
-            Sampai <span className="font-heading font-extrabold">+{count * XP_PER_SOAL} XP</span>{" "}
-            kalau semua benar. Jawaban salah ngurangin 1 heart.
+            Sampai <span className="font-heading font-extrabold">+{count * AI_XP_CORRECT} XP</span>{" "}
+            kalau semua benar. Jawaban salah &minus;{AI_XP_WRONG} XP, heart gak berkurang.
           </p>
           <div className="shrink-0 [&>button]:w-full sm:[&>button]:w-auto">
             <Button

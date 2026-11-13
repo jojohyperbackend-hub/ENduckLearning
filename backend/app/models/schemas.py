@@ -166,6 +166,11 @@ class QuizFormOptionsOut(HeartStateOut):
     # Gerbang 1: minimal 1 lesson pernah selesai. Kalau belum, form gak boleh dibuka.
     gate1_passed: bool
     gate1_message: Optional[str] = None
+    # Syarat XP: total XP minimal xp_required. Dicek setelah Gerbang 1.
+    xp_required: int
+    total_xp: int
+    xp_gate_passed: bool
+    xp_gate_message: Optional[str] = None
     # Topik manual cuma dari unit yang sudah terbuka buat user ini.
     available_topics: List[str]
     tipe_soal_options: List[str] = Field(
