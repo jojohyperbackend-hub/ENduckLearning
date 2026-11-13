@@ -57,8 +57,9 @@ const LessonSummary = ({ stats, title, message, onFinish, secondary = null }: Le
         </div>
 
         <div className="grid w-full grid-cols-3 gap-3 text-left">
-          <Tile label="XP didapat">
-            +<CountUp value={stats.xpGained} />
+          <Tile label={stats.xpGained < 0 ? "XP berkurang" : "XP didapat"}>
+            {stats.xpGained < 0 ? "−" : "+"}
+            <CountUp value={Math.abs(stats.xpGained)} />
           </Tile>
           <Tile label="Akurasi">
             <CountUp value={accuracy} />%

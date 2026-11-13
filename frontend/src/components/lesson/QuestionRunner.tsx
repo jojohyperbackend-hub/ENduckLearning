@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { X } from "lucide-react";
+import { Star, X } from "lucide-react";
 import Button from "../common/Button";
 import Card from "../common/Card";
 import HeartsEmptyModal from "../common/HeartsEmptyModal";
@@ -31,7 +31,8 @@ export interface RunStats {
 
 interface QuestionRunnerProps {
   items: RunnerItem[];
-  initialHearts: HeartSnapshot;
+  // null = mode tanpa heart (Latihan AI): jawaban salah motong XP, heart gak dipakai.
+  initialHearts: HeartSnapshot | null;
   exitLabel: string;
   wrongHint: string;
   finishLabel: string;
@@ -39,6 +40,23 @@ interface QuestionRunnerProps {
   // Dipanggil setelah soal terakhir. Lempar error kalau gagal, runner yang nampilin.
   finish: (stats: RunStats) => Promise<void>;
 }
+
+// Heart di header + hitung mundurnya. Dipisah biar hook jam heart cuma jalan kalau mode heart.
+const RunnerHearts = ({ snapshot }: { snapshot: HeartSnapshot }) => {
+  const clock = useHeartClock(snapshot);
+  return <HeartsMeter hearts={clock.hearts} nextIn={clock.nextIn} />;
+};
+
+// Mode XP: tampilkan XP bersih yang didapat sejauh ini di latihan ini.
+const RunnerXp = ({ xp }: { xp: number }) => (
+  <p
+    className="flex shrink-0 items-center gap-1.5 font-heading text-card-header font-extrabold tabular-nums"
+    aria-label={`XP latihan ini ${xp}`}
+  >
+    <Star size={20} className="fill-[var(--color-cta)] text-[var(--color-cta)]" aria-hidden="true" />
+    {xp > 0 ? `+${xp}` : xp < 0 ? `−${Math.abs(xp)}` : "0"} XP
+  </p>
+);
 
 const QuestionRunner = ({
   items,
@@ -60,14 +78,14 @@ const QuestionRunner = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [hearts, setHearts] = useState<HeartSnapshot>(initialHearts);
+  const usesHearts = initialHearts !== null;
+  const [hearts, setHearts] = useState<HeartSnapshot | null>(initialHearts);
   // Heart 0 pas masuk (buka lewat URL langsung): soal gak boleh kelihatan sama sekali.
-  const [blockedAtStart] = useState(() => initialHearts.hearts <= 0);
+  const [blockedAtStart] = useState(() => initialHearts !== null && initialHearts.hearts <= 0);
   const [heartsModal, setHeartsModal] = useState<HeartSnapshot | null>(() =>
-    initialHearts.hearts <= 0 ? initialHearts : null,
+    initialHearts !== null && initialHearts.hearts <= 0 ? initialHearts : null,
   );
   const panelRef = useRef<HTMLDivElement>(null);
-  const clock = useHeartClock(hearts);
 
   const item = items[index];
   const isLast = index === total - 1;
@@ -93,19 +111,21 @@ const QuestionRunner = ({
     setActionError(null);
     try {
       const attempt = await submit(item, answer.trim());
-      const snapshot = toHeartSnapshot(attempt);
       setResult(attempt);
-      setHearts(snapshot);
       setOutcomes((previous) =>
         previous.map((outcome, position) => (position === index ? attempt.correct : outcome)),
       );
       setXpGained((previous) => previous + attempt.xp_earned);
-      // Titik B: heart jadi 0 setelah jawaban salah, langsung popup.
-      if (!attempt.correct && attempt.hearts_remaining <= 0) {
-        setHeartsModal(snapshot);
+      if (usesHearts) {
+        const snapshot = toHeartSnapshot(attempt);
+        setHearts(snapshot);
+        // Titik B: heart jadi 0 setelah jawaban salah, langsung popup.
+        if (!attempt.correct && attempt.hearts_remaining <= 0) {
+          setHeartsModal(snapshot);
+        }
       }
     } catch (error) {
-      if (isHeartsEmptyError(error)) {
+      if (usesHearts && isHeartsEmptyError(error)) {
         await handleHeartsEmpty();
       } else {
         setActionError(getErrorMessage(error));
@@ -113,7 +133,7 @@ const QuestionRunner = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [answer, handleHeartsEmpty, heartsModal, index, isSubmitting, item, result, submit]);
+  }, [answer, handleHeartsEmpty, heartsModal, index, isSubmitting, item, result, submit, usesHearts]);
 
   // Enter buat kirim jawaban pilihan ganda (kolom ketik punya handler sendiri).
   useEffect(() => {
@@ -139,7 +159,7 @@ const QuestionRunner = ({
         xpGained,
       });
     } catch (error) {
-      if (isHeartsEmptyError(error)) {
+      if (usesHearts && isHeartsEmptyError(error)) {
         await handleHeartsEmpty();
       } else {
         setActionError(getErrorMessage(error));
@@ -185,7 +205,7 @@ const QuestionRunner = ({
           <X size={20} aria-hidden="true" />
         </Link>
         <LessonProgress total={total} current={index} outcomes={outcomes} />
-        <HeartsMeter hearts={clock.hearts} nextIn={clock.nextIn} />
+        {hearts ? <RunnerHearts snapshot={hearts} /> : <RunnerXp xp={xpGained} />}
       </header>
 
       <Card className="border-2 border-[var(--color-text)] p-5 shadow-[8px_8px_0_var(--color-cta)] sm:p-8">

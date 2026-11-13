@@ -23,6 +23,8 @@ import ProfilePage from "./pages/ProfilePage";
 import BottomNav from "./components/common/BottomNav";
 import LessonDetailPage from "./pages/LessonDetailPage";
 import CloudLayer from "./components/common/CloudLayer";
+import CheatToast from "./components/common/CheatToast";
+import { useXpCheat } from "./hooks/useXpCheat";
 
 interface GuardProps {
   children: ReactNode;
@@ -109,6 +111,7 @@ const AppLayout = () => {
   const { status } = useAuth();
   const location = useLocation();
   const isLessonPlay = location.pathname.startsWith("/lesson/");
+  const cheatNotice = useXpCheat(status === "authenticated");
   const showOnLanding = location.pathname === "/";
   // Navbar tampil di landing dan halaman app. Login & lesson punya header sendiri.
   const showNavbar = location.pathname !== "/login" && !isLessonPlay;
@@ -121,6 +124,7 @@ const AppLayout = () => {
 
   return (
     <div className="grid-bg relative isolate min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <CheatToast notice={cheatNotice} />
       {showFloatingWords && <FloatingWords />}
       <CloudLayer />
       {/* Sticky cuma di landing. Di halaman app navbar ikut scroll biar gak numpuk di atas kartu. */}

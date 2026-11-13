@@ -12,7 +12,7 @@ from app.models.schemas import (
     ReviewAttemptRequest,
     ReviewQueueItemOut,
 )
-from app.services.ai_service import generate_translate_feedback
+from app.services.grading_service import grade_short_answer, grade_translation
 from app.services.progress_service import (
     HEARTS_EMPTY_CODE,
     HeartsEmptyError,
@@ -122,16 +122,21 @@ def attempt_review(
         except RateLimitExceeded as exc:
             return error_response(exc.message)
 
-        feedback_result = generate_translate_feedback(
+        feedback_result = grade_translation(
+            question=exercise_row["question"],
             user_answer=payload.user_answer,
             expected_answer=exercise_row["expected_answer"],
-            question_text=exercise_row["question"],
         )
         is_correct = feedback_result.is_meaning_correct
         feedback_text = feedback_result.feedback
         grammar_note = feedback_result.grammar_note
     else:
-        is_correct = payload.user_answer.strip().lower() == exercise_row["expected_answer"].strip().lower()
+        is_correct = grade_short_answer(
+            exercise_row["type"],
+            exercise_row["question"],
+            payload.user_answer,
+            exercise_row["expected_answer"],
+        )
         feedback_text = None
         grammar_note = None
 
