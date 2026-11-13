@@ -17,14 +17,16 @@ from app.models.schemas import (
 from app.services.ai_service import generate_translate_feedback
 from app.services.milestone_service import check_and_award_badges
 from app.services.progress_service import (
+    HEARTS_EMPTY_CODE,
+    HeartsEmptyError,
     add_xp,
     apply_heart_loss,
     fetch_user_progress_row,
-    reset_hearts,
+    heart_fields,
+    require_hearts,
     update_current_lesson,
 )
-from app.utils.cache import check_translate_attempt_rate_limit
-from app.utils.cache import RateLimitExceeded
+from app.utils.cache import RateLimitExceeded, check_translate_attempt_rate_limit
 from app.utils.helpers import error_response, success_response, utcnow
 
 router = APIRouter(tags=["lessons"])
@@ -34,23 +36,25 @@ EXERCISE_TIDAK_DITEMUKAN = "Soal tidak ditemukan pada lesson ini"
 LESSON_TERKUNCI = "Lesson ini masih terkunci, selesaikan lesson sebelumnya terlebih dahulu"
 
 
-def _is_lesson_locked(user_id: UUID, lesson_id: UUID) -> bool:
+def _fetch_lesson_row(lesson_id: UUID) -> Dict[str, Any]:
     client = get_service_client()
-
-    lesson_result = (
+    result = (
         client.table("lesson")
-        .select("lesson_id, unit_id, order_index")
+        .select("lesson_id, unit_id, order_index, xp_reward_base")
         .eq("lesson_id", str(lesson_id))
         .limit(1)
         .execute()
     )
-    if not lesson_result.data:
+    if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=LESSON_TIDAK_DITEMUKAN)
-    lesson_row = lesson_result.data[0]
+    return result.data[0]
 
+
+def _is_lesson_locked(user_id: UUID, lesson_row: Dict[str, Any]) -> bool:
     if lesson_row["order_index"] <= 1:
         return False
 
+    client = get_service_client()
     previous_lesson_result = (
         client.table("lesson")
         .select("lesson_id")
@@ -95,7 +99,20 @@ def _fetch_exercises_public(lesson_id: UUID) -> List[ExercisePublicOut]:
     ]
 
 
-def _calculate_xp_per_exercise(xp_reward_base: int, jumlah_exercise: int) -> int:
+def _xp_per_exercise(lesson_id: UUID) -> int:
+    client = get_service_client()
+    lesson_result = (
+        client.table("lesson")
+        .select("xp_reward_base")
+        .eq("lesson_id", str(lesson_id))
+        .limit(1)
+        .execute()
+    )
+    xp_reward_base = lesson_result.data[0]["xp_reward_base"] if lesson_result.data else 0
+    exercises_result = (
+        client.table("exercise").select("exercise_id").eq("lesson_id", str(lesson_id)).execute()
+    )
+    jumlah_exercise = len(exercises_result.data)
     if jumlah_exercise <= 0:
         return 0
     return max(1, xp_reward_base // jumlah_exercise)
@@ -113,7 +130,7 @@ def _fetch_exercise_row(exercise_id: UUID) -> Optional[Dict[str, Any]]:
     return result.data[0] if result.data else None
 
 
-def _record_attempt_log(user_id: UUID, topic: str, is_correct: bool) -> None:
+def record_attempt_log(user_id: UUID, topic: str, is_correct: bool) -> None:
     client = get_service_client()
     client.table("attempt_log").insert(
         {
@@ -147,22 +164,43 @@ def _add_to_review_queue(user_id: UUID, exercise_id: UUID) -> None:
     ).execute()
 
 
+def _finish_attempt(
+    user_id: UUID,
+    lesson_id: UUID,
+    exercise_row: Dict[str, Any],
+    is_correct: bool,
+    feedback: Optional[str],
+    grammar_note: Optional[str],
+) -> ApiResponse:
+    record_attempt_log(user_id, exercise_row["topic"], is_correct)
+
+    if is_correct:
+        xp_earned = _xp_per_exercise(lesson_id)
+        add_xp(user_id, xp_earned)
+        progress_row = fetch_user_progress_row(user_id)
+    else:
+        xp_earned = 0
+        _add_to_review_queue(user_id, UUID(exercise_row["exercise_id"]))
+        try:
+            progress_row = apply_heart_loss(user_id)
+        except HeartsEmptyError:
+            return error_response(HEARTS_EMPTY_CODE)
+
+    result = AttemptResultOut(
+        correct=is_correct,
+        xp_earned=xp_earned,
+        feedback=feedback,
+        grammar_note=grammar_note,
+        **heart_fields(progress_row),
+    )
+    return success_response(result)
+
+
 @router.get("/lessons/{lesson_id}", response_model=ApiResponse)
 def get_lesson_detail(lesson_id: UUID, user_id: UUID = Depends(get_current_user_id)) -> ApiResponse:
-    if _is_lesson_locked(user_id, lesson_id):
+    lesson_row = _fetch_lesson_row(lesson_id)
+    if _is_lesson_locked(user_id, lesson_row):
         return error_response(LESSON_TERKUNCI)
-
-    client = get_service_client()
-    lesson_result = (
-        client.table("lesson")
-        .select("lesson_id, unit_id, order_index, xp_reward_base")
-        .eq("lesson_id", str(lesson_id))
-        .limit(1)
-        .execute()
-    )
-    if not lesson_result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=LESSON_TIDAK_DITEMUKAN)
-    lesson_row = lesson_result.data[0]
 
     exercises = _fetch_exercises_public(lesson_id)
     progress_row = fetch_user_progress_row(user_id)
@@ -172,8 +210,8 @@ def get_lesson_detail(lesson_id: UUID, user_id: UUID = Depends(get_current_user_
         unit_id=UUID(lesson_row["unit_id"]),
         order_index=lesson_row["order_index"],
         xp_reward_base=lesson_row["xp_reward_base"],
-        hearts_remaining=progress_row["hearts_remaining"],
         exercises=exercises,
+        **heart_fields(progress_row),
     )
     return success_response(detail)
 
@@ -188,48 +226,15 @@ def attempt_standard(
     if exercise_row is None or exercise_row["lesson_id"] != str(lesson_id):
         return error_response(EXERCISE_TIDAK_DITEMUKAN)
 
+    # Titik C: heart dicek di database SEBELUM jawaban diproses.
+    try:
+        require_hearts(user_id)
+    except HeartsEmptyError:
+        return error_response(HEARTS_EMPTY_CODE)
+
     expected_answer = exercise_row["expected_answer"]
     is_correct = payload.user_answer.strip().lower() == expected_answer.strip().lower()
-
-    _record_attempt_log(user_id, exercise_row["topic"], is_correct)
-
-    progress_row = fetch_user_progress_row(user_id)
-
-    if is_correct:
-        lesson_result = (
-            get_service_client()
-            .table("lesson")
-            .select("xp_reward_base")
-            .eq("lesson_id", str(lesson_id))
-            .limit(1)
-            .execute()
-        )
-        xp_reward_base = lesson_result.data[0]["xp_reward_base"] if lesson_result.data else 0
-        exercises_count_result = (
-            get_service_client()
-            .table("exercise")
-            .select("exercise_id")
-            .eq("lesson_id", str(lesson_id))
-            .execute()
-        )
-        xp_earned = _calculate_xp_per_exercise(xp_reward_base, len(exercises_count_result.data))
-        add_xp(user_id, xp_earned)
-        hearts_remaining = progress_row["hearts_remaining"]
-    else:
-        xp_earned = 0
-        hearts_remaining = apply_heart_loss(user_id)
-        _add_to_review_queue(user_id, payload.exercise_id)
-        if hearts_remaining == 5 and progress_row["hearts_remaining"] == 0:
-            pass
-
-    result = AttemptResultOut(
-        correct=is_correct,
-        xp_earned=xp_earned,
-        hearts_remaining=hearts_remaining,
-        feedback=None,
-        grammar_note=None,
-    )
-    return success_response(result)
+    return _finish_attempt(user_id, lesson_id, exercise_row, is_correct, None, None)
 
 
 @router.post("/lessons/{lesson_id}/attempt/translate", response_model=ApiResponse)
@@ -243,6 +248,11 @@ def attempt_translate(
         return error_response(EXERCISE_TIDAK_DITEMUKAN)
 
     try:
+        require_hearts(user_id)
+    except HeartsEmptyError:
+        return error_response(HEARTS_EMPTY_CODE)
+
+    try:
         check_translate_attempt_rate_limit(str(user_id))
     except RateLimitExceeded as exc:
         return error_response(exc.message)
@@ -252,60 +262,79 @@ def attempt_translate(
         expected_answer=exercise_row["expected_answer"],
         question_text=exercise_row["question"],
     )
-    is_correct = feedback_result.is_meaning_correct
-
-    _record_attempt_log(user_id, exercise_row["topic"], is_correct)
-
-    progress_row = fetch_user_progress_row(user_id)
-
-    if is_correct:
-        lesson_result = (
-            get_service_client()
-            .table("lesson")
-            .select("xp_reward_base")
-            .eq("lesson_id", str(lesson_id))
-            .limit(1)
-            .execute()
-        )
-        xp_reward_base = lesson_result.data[0]["xp_reward_base"] if lesson_result.data else 0
-        exercises_count_result = (
-            get_service_client()
-            .table("exercise")
-            .select("exercise_id")
-            .eq("lesson_id", str(lesson_id))
-            .execute()
-        )
-        xp_earned = _calculate_xp_per_exercise(xp_reward_base, len(exercises_count_result.data))
-        add_xp(user_id, xp_earned)
-        hearts_remaining = progress_row["hearts_remaining"]
-    else:
-        xp_earned = 0
-        hearts_remaining = apply_heart_loss(user_id)
-        _add_to_review_queue(user_id, payload.exercise_id)
-
-    result = AttemptResultOut(
-        correct=is_correct,
-        xp_earned=xp_earned,
-        hearts_remaining=hearts_remaining,
-        feedback=feedback_result.feedback,
-        grammar_note=feedback_result.grammar_note,
+    return _finish_attempt(
+        user_id,
+        lesson_id,
+        exercise_row,
+        feedback_result.is_meaning_correct,
+        feedback_result.feedback,
+        feedback_result.grammar_note,
     )
-    return success_response(result)
+
+
+def _next_lesson_id(lesson_row: Dict[str, Any]) -> Optional[UUID]:
+    """Lesson setelah lesson ini: berikutnya di unit yang sama, atau lesson pertama unit berikutnya."""
+    client = get_service_client()
+    same_unit_result = (
+        client.table("lesson")
+        .select("lesson_id, order_index")
+        .eq("unit_id", lesson_row["unit_id"])
+        .gt("order_index", lesson_row["order_index"])
+        .order("order_index")
+        .limit(1)
+        .execute()
+    )
+    if same_unit_result.data:
+        return UUID(same_unit_result.data[0]["lesson_id"])
+
+    unit_result = (
+        client.table("unit")
+        .select("unit_id, course_id, order_index")
+        .eq("unit_id", lesson_row["unit_id"])
+        .limit(1)
+        .execute()
+    )
+    if not unit_result.data:
+        return None
+    unit_row = unit_result.data[0]
+
+    next_unit_result = (
+        client.table("unit")
+        .select("unit_id")
+        .eq("course_id", unit_row["course_id"])
+        .gt("order_index", unit_row["order_index"])
+        .order("order_index")
+        .limit(1)
+        .execute()
+    )
+    if not next_unit_result.data:
+        return None
+
+    first_lesson_result = (
+        client.table("lesson")
+        .select("lesson_id")
+        .eq("unit_id", next_unit_result.data[0]["unit_id"])
+        .order("order_index")
+        .limit(1)
+        .execute()
+    )
+    return UUID(first_lesson_result.data[0]["lesson_id"]) if first_lesson_result.data else None
 
 
 @router.post("/lessons/{lesson_id}/complete", response_model=ApiResponse)
 def complete_lesson(lesson_id: UUID, user_id: UUID = Depends(get_current_user_id)) -> ApiResponse:
-    client = get_service_client()
-    lesson_result = (
-        client.table("lesson")
-        .select("lesson_id, unit_id")
-        .eq("lesson_id", str(lesson_id))
-        .limit(1)
-        .execute()
-    )
-    if not lesson_result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=LESSON_TIDAK_DITEMUKAN)
+    lesson_row = _fetch_lesson_row(lesson_id)
+    if _is_lesson_locked(user_id, lesson_row):
+        return error_response(LESSON_TERKUNCI)
 
+    # Heart 0 artinya lesson berhenti di tengah: sisa soal dianggap belum selesai,
+    # jadi lesson gak boleh ditandai complete.
+    try:
+        require_hearts(user_id)
+    except HeartsEmptyError:
+        return error_response(HEARTS_EMPTY_CODE)
+
+    client = get_service_client()
     existing_completion = (
         client.table("lesson_completion")
         .select("lesson_id")
@@ -323,26 +352,13 @@ def complete_lesson(lesson_id: UUID, user_id: UUID = Depends(get_current_user_id
             }
         ).execute()
 
-    progress_row = fetch_user_progress_row(user_id)
-
-    next_lesson_result = (
-        client.table("lesson")
-        .select("lesson_id")
-        .eq("unit_id", lesson_result.data[0]["unit_id"])
-        .order("order_index")
-        .execute()
-    )
-    update_current_lesson(
-        user_id,
-        UUID(next_lesson_result.data[0]["lesson_id"]) if next_lesson_result.data else None,
-    )
-
-    reset_hearts(user_id)
+    update_current_lesson(user_id, _next_lesson_id(lesson_row))
     badge_earned = check_and_award_badges(user_id)
+    progress_row = fetch_user_progress_row(user_id)
 
     result = LessonCompleteResultOut(
         xp_earned_total=progress_row["total_xp"],
-        hearts_remaining=5,
         badge_earned=badge_earned,
+        **heart_fields(progress_row),
     )
     return success_response(result)

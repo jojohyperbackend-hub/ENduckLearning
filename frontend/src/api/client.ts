@@ -118,5 +118,13 @@ export const get = <T>(path: string) => request<T>(path);
 export const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body });
 
-export const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : "Terjadi kesalahan.";
+// Kode dari backend kalau heart di database sudah 0 (jaring pengaman API).
+export const HEARTS_EMPTY = "HEARTS_EMPTY";
+
+export const isHeartsEmptyError = (error: unknown): boolean =>
+  error instanceof ApiError && error.message === HEARTS_EMPTY;
+
+export const getErrorMessage = (error: unknown): string => {
+  if (isHeartsEmptyError(error)) return "Heart kamu habis. Tunggu heart terisi lagi.";
+  return error instanceof Error ? error.message : "Terjadi kesalahan.";
+};

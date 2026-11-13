@@ -141,3 +141,114 @@ body {
   outline: 2px solid var(--color-text);
   outline-offset: 3px;
 } */
+
+/* ============================================
+   Dashboard — Sunrise Path (dashboard-design.md)
+   ============================================ */
+
+/* Isi matahari naik pelan tiap progres unit bertambah */
+.sun-fill {
+  transition: transform 600ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes node-bounce {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-7px);
+    }
+  }
+
+  .node-bounce {
+    animation: node-bounce 2s ease-in-out infinite;
+  }
+  .node-bounce:hover,
+  .node-bounce:active {
+    animation-play-state: paused;
+  }
+
+  @keyframes node-pop {
+    0% {
+      transform: scale(0.6);
+      opacity: 0;
+    }
+    70% {
+      transform: scale(1.12);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  /* pop sekali, baru lanjut mantul */
+  .node-pop {
+    animation:
+      node-pop 450ms ease-out,
+      node-bounce 2s ease-in-out 450ms infinite;
+  }
+
+  @keyframes confetti-burst {
+    0% {
+      transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy)))
+        scale(1) rotate(160deg);
+      opacity: 0;
+    }
+  }
+
+  .confetti-piece {
+    opacity: 0;
+    animation: confetti-burst 900ms ease-out forwards;
+  }
+
+  @keyframes sun-rays-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .sun-rays-spin {
+    animation: sun-rays-spin 40s linear infinite;
+  }
+
+  @keyframes skeleton-pulse {
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .skeleton {
+    animation: skeleton-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece {
+    display: none;
+  }
+}
+
+/* Popup heart habis: muncul sekali, gak goyang terus */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes modal-pop {
+    0% {
+      transform: translateY(12px) scale(0.96);
+      opacity: 0;
+    }
+    100% {
+      transform: none;
+      opacity: 1;
+    }
+  }
+
+  .modal-pop {
+    animation: modal-pop 220ms ease-out both;
+  }
+}

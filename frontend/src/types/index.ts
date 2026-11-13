@@ -31,6 +31,16 @@ export interface LoginPayload {
   password: string;
 }
 
+// ---------- Heart ----------
+// Sisa detik sampai tiap heart yang hilang balik (urut dari yang paling cepat).
+// Dihitung server pakai jam UTC; frontend cuma hitung mundur sendiri.
+export interface HeartState {
+  hearts_remaining: number;
+  heart_max: number;
+  heart_regen_in_seconds: number[];
+  next_heart_in_seconds: number | null;
+}
+
 // ---------- Badge & progress ----------
 export interface Badge {
   badge_id: string;
@@ -39,11 +49,10 @@ export interface Badge {
   earned_at: string;
 }
 
-export interface Progress {
+export interface Progress extends HeartState {
   user_id: string;
   total_xp: number;
   current_streak: number;
-  hearts_remaining: number;
   current_lesson_id: string | null;
   badges: Badge[];
 }
@@ -79,26 +88,23 @@ export interface Exercise {
   options: string[] | null;
 }
 
-export interface LessonDetail {
+export interface LessonDetail extends HeartState {
   lesson_id: string;
   unit_id: string;
   order_index: number;
   xp_reward_base: number;
-  hearts_remaining: number;
   exercises: Exercise[];
 }
 
-export interface AttemptResult {
+export interface AttemptResult extends HeartState {
   correct: boolean;
   xp_earned: number;
-  hearts_remaining: number;
   feedback: string | null; // hanya terisi untuk soal translate
   grammar_note: string | null;
 }
 
-export interface LessonCompleteResult {
+export interface LessonCompleteResult extends HeartState {
   xp_earned_total: number;
-  hearts_remaining: number;
   badge_earned: Badge | null;
 }
 
@@ -117,7 +123,11 @@ export interface QuizFormRequest {
   tingkat_kesulitan: DifficultyOption;
 }
 
-export interface QuizFormOptions {
+export interface QuizFormOptions extends HeartState {
+  // Gerbang 1: minimal 1 lesson pernah selesai
+  gate1_passed: boolean;
+  gate1_message: string | null;
+  // Topik manual, cuma dari unit yang sudah terbuka
   available_topics: string[];
   tipe_soal_options: QuizTypeOption[];
   tingkat_kesulitan_options: DifficultyOption[];
@@ -126,6 +136,7 @@ export interface QuizFormOptions {
 export interface QuizQuestion {
   question_id: string;
   type: ExerciseType;
+  topic: string;
   question_text: string;
   options: string[] | null;
   source: QuestionSource;
@@ -140,14 +151,13 @@ export interface QuizResult {
   questions: QuizQuestion[];
 }
 
-export interface QuizCompleteResult {
+export interface QuizCompleteResult extends HeartState {
   quiz_id: string;
   total_soal: number;
   jumlah_benar: number;
   jumlah_salah: number;
   akurasi: number;
   total_xp_earned: number;
-  hearts_remaining: number;
   badge_earned: Badge | null;
 }
 

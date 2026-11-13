@@ -44,13 +44,26 @@ def _check_hourly_limit(cache: TTLCache, user_id: str, limit: int, feature_name:
     with _rate_limit_lock:
         current_count = cache.get(user_id, 0)
         if current_count >= limit:
-            raise RateLimitExceeded(
-                f"Batas penggunaan {feature_name} tercapai ({limit}x per jam), coba lagi nanti"
-            )
+            raise RateLimitExceeded(_limit_message(feature_name, limit))
         cache[user_id] = current_count + 1
 
 
-def check_practice_generate_rate_limit(user_id: str) -> None:
+def _limit_message(feature_name: str, limit: int) -> str:
+    return f"Batas penggunaan {feature_name} tercapai ({limit}x per jam), coba lagi nanti"
+
+
+def ensure_practice_generate_allowed(user_id: str) -> None:
+    """Cek limit generate TANPA menghitung. Dipanggil di urutan cek submit."""
+    with _rate_limit_lock:
+        if _practice_generate_hits.get(user_id, 0) >= PRACTICE_GENERATE_LIMIT_PER_HOUR:
+            raise RateLimitExceeded(
+                _limit_message("generate soal latihan", PRACTICE_GENERATE_LIMIT_PER_HOUR)
+            )
+
+
+def record_practice_generate(user_id: str) -> None:
+    """Hitung 1 generate. Dipanggil setelah semua cek lolos, tepat sebelum soal dibuat,
+    jadi submit yang ditolak (heart habis, topik kurang) gak ikut makan jatah."""
     _check_hourly_limit(
         _practice_generate_hits, user_id, PRACTICE_GENERATE_LIMIT_PER_HOUR, "generate soal latihan"
     )

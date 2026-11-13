@@ -104,6 +104,9 @@ const useSmoothScroll = () => {
 const AppLayout = () => {
   const location = useLocation();
   const showOnLanding = location.pathname === "/";
+  // Navbar tampil di landing dan halaman app. Login & lesson punya header sendiri.
+  const showNavbar =
+    location.pathname !== "/login" && !location.pathname.startsWith("/lesson");
   const showFloatingWords =
     location.pathname === "/" ||
     location.pathname === "/login" ||
@@ -112,7 +115,10 @@ const AppLayout = () => {
   return (
     <div className="grid-bg relative isolate min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
       {showFloatingWords && <FloatingWords />}
-      <div className="sticky top-0 z-50">{showOnLanding && <Navbar />}</div>
+      {/* Sticky cuma di landing. Di halaman app navbar ikut scroll biar gak numpuk di atas kartu. */}
+      <div className={showOnLanding ? "sticky top-0 z-50" : "relative z-50"}>
+        {showNavbar && <Navbar />}
+      </div>
 
       <main className="min-h-screen flex flex-col justify-center mx-auto max-w-7xl px-4">
         <Routes>

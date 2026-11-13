@@ -1,13 +1,13 @@
 import threading
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends
 
 from app.auth.middleware import get_current_user_id
-from app.database import get_service_client
 from app.models.schemas import (
     ApiResponse,
+    AttemptResultOut,
     QuizAttemptRequest,
     QuizCompleteResultOut,
     QuizFormOptionsOut,
@@ -15,28 +15,79 @@ from app.models.schemas import (
     QuizQuestionItemOut,
     QuizResultOut,
 )
-from app.services.ai_service import XP_PER_CORRECT_ANSWER_AI_QUIZ, generate_practice, generate_translate_feedback
+from app.routes.lesson_routes import record_attempt_log
+from app.services.ai_service import (
+    XP_PER_CORRECT_ANSWER_AI_QUIZ,
+    eligible_auto_topics,
+    fetch_topic_statistics,
+    generate_practice,
+    generate_translate_feedback,
+)
 from app.services.milestone_service import check_and_award_badges
-from app.services.progress_service import add_xp, apply_heart_loss, fetch_user_progress_row
-from app.utils.cache import RateLimitExceeded, check_practice_generate_rate_limit, check_translate_attempt_rate_limit
+from app.services.progress_service import (
+    HEARTS_EMPTY_CODE,
+    HeartsEmptyError,
+    add_xp,
+    apply_heart_loss,
+    fetch_user_progress_row,
+    heart_fields,
+    require_hearts,
+)
+from app.services.unlock_service import GATE1_MESSAGE, get_unlocked_topics, has_completed_any_lesson
+from app.utils.cache import (
+    RateLimitExceeded,
+    check_translate_attempt_rate_limit,
+    ensure_practice_generate_allowed,
+    record_practice_generate,
+)
 from app.utils.helpers import error_response, success_response, utcnow
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 QUIZ_TIDAK_DITEMUKAN = "Quiz tidak ditemukan atau sudah kedaluwarsa"
 QUESTION_TIDAK_DITEMUKAN = "Soal tidak ditemukan dalam quiz ini"
+QUESTION_SUDAH_DIJAWAB = "Soal ini sudah kamu jawab"
+PROSES_MASIH_JALAN = "Soal latihan kamu masih diproses, tunggu sebentar"
+RIWAYAT_BELUM_CUKUP = (
+    "Riwayat latihan kamu belum cukup buat topik mana pun. "
+    "Jawab minimal 3 soal di satu topik dulu, atau pilih topik sendiri."
+)
+TOPIK_BELUM_TERBUKA = "Topik ini belum terbuka. Pilih topik dari unit yang sudah kamu buka."
+GENERATE_GAGAL = "Tidak ada soal yang bisa dibuat saat ini, coba lagi nanti"
 
 _active_quizzes: Dict[str, Dict[str, Any]] = {}
 _active_quizzes_lock = threading.Lock()
 
+# Kondisi 6: satu user cuma boleh punya 1 proses generate yang jalan.
+_generating_users: Set[str] = set()
+_generating_users_lock = threading.Lock()
+
+
+def _begin_generate(user_key: str) -> bool:
+    with _generating_users_lock:
+        if user_key in _generating_users:
+            return False
+        _generating_users.add(user_key)
+        return True
+
+
+def _end_generate(user_key: str) -> None:
+    with _generating_users_lock:
+        _generating_users.discard(user_key)
+
 
 @router.get("/quiz/form-options", response_model=ApiResponse)
 def get_quiz_form_options(user_id: UUID = Depends(get_current_user_id)) -> ApiResponse:
-    client = get_service_client()
-    result = client.table("exercise").select("topic").execute()
-    available_topics = sorted({row["topic"] for row in result.data})
+    """Dipanggil pas tombol Latihan AI diklik (Gerbang 1 + Titik A heart)."""
+    progress_row = fetch_user_progress_row(user_id)
+    gate1_passed = has_completed_any_lesson(user_id)
 
-    options = QuizFormOptionsOut(available_topics=available_topics)
+    options = QuizFormOptionsOut(
+        gate1_passed=gate1_passed,
+        gate1_message=None if gate1_passed else GATE1_MESSAGE,
+        available_topics=get_unlocked_topics(user_id) if gate1_passed else [],
+        **heart_fields(progress_row),
+    )
     return success_response(options)
 
 
@@ -44,21 +95,53 @@ def get_quiz_form_options(user_id: UUID = Depends(get_current_user_id)) -> ApiRe
 def generate_practice_quiz(
     payload: QuizFormRequest, user_id: UUID = Depends(get_current_user_id)
 ) -> ApiResponse:
-    try:
-        check_practice_generate_rate_limit(str(user_id))
-    except RateLimitExceeded as exc:
-        return error_response(exc.message)
+    user_key = str(user_id)
 
-    questions_data, status_value = generate_practice(
-        user_id=user_id,
-        jumlah_soal=payload.jumlah_soal,
-        tipe_soal=payload.tipe_soal,
-        fokus_topik=payload.fokus_topik,
-        tingkat_kesulitan=payload.tingkat_kesulitan,
-    )
+    # Gerbang 1 tetap dijaga di API, walau form harusnya gak kebuka kalau belum lolos.
+    if not has_completed_any_lesson(user_id):
+        return error_response(GATE1_MESSAGE)
+
+    # Urutan cek submit: proses lain jalan -> rate limit -> heart kosong -> kecukupan topik.
+    if not _begin_generate(user_key):
+        return error_response(PROSES_MASIH_JALAN)
+
+    try:
+        try:
+            ensure_practice_generate_allowed(user_key)
+        except RateLimitExceeded as exc:
+            return error_response(exc.message)
+
+        try:
+            require_hearts(user_id)
+        except HeartsEmptyError:
+            return error_response(HEARTS_EMPTY_CODE)
+
+        topic_statistics = fetch_topic_statistics(user_id)
+        if payload.fokus_topik == "auto":
+            topic_scores, jumlah_data_per_topic, _ = topic_statistics
+            if not eligible_auto_topics(topic_scores, jumlah_data_per_topic):
+                return error_response(RIWAYAT_BELUM_CUKUP)
+        elif payload.fokus_topik not in get_unlocked_topics(user_id):
+            return error_response(TOPIK_BELUM_TERBUKA)
+
+        try:
+            record_practice_generate(user_key)
+        except RateLimitExceeded as exc:
+            return error_response(exc.message)
+
+        questions_data, status_value = generate_practice(
+            user_id=user_id,
+            jumlah_soal=payload.jumlah_soal,
+            tipe_soal=payload.tipe_soal,
+            fokus_topik=payload.fokus_topik,
+            tingkat_kesulitan=payload.tingkat_kesulitan,
+            topic_statistics=topic_statistics,
+        )
+    finally:
+        _end_generate(user_key)
 
     if not questions_data:
-        return error_response("Tidak ada soal yang bisa dibuat saat ini, coba lagi nanti")
+        return error_response(GENERATE_GAGAL)
 
     quiz_id = uuid4()
     quiz_questions: List[QuizQuestionItemOut] = []
@@ -82,6 +165,7 @@ def generate_practice_quiz(
             QuizQuestionItemOut(
                 question_id=question_id,
                 type=question_data["type"],
+                topic=question_data["topic"],
                 question_text=question_data["question"],
                 options=question_data.get("options"),
                 source=question_data["source"],
@@ -91,7 +175,7 @@ def generate_practice_quiz(
     generated_at = utcnow()
     with _active_quizzes_lock:
         _active_quizzes[str(quiz_id)] = {
-            "user_id": str(user_id),
+            "user_id": user_key,
             "questions": internal_questions,
             "attempts": {},
             "generated_at": generated_at,
@@ -125,6 +209,19 @@ def attempt_quiz_question(
     if question_row is None:
         return error_response(QUESTION_TIDAK_DITEMUKAN)
 
+    with _active_quizzes_lock:
+        already_answered = str(payload.question_id) in quiz_state["attempts"]
+    if already_answered:
+        return error_response(QUESTION_SUDAH_DIJAWAB)
+
+    # Titik C: heart dicek di database sebelum jawaban diproses.
+    try:
+        require_hearts(user_id)
+    except HeartsEmptyError:
+        return error_response(HEARTS_EMPTY_CODE)
+
+    feedback_text = None
+    grammar_note = None
     if question_row["type"] == "translate":
         try:
             check_translate_attempt_rate_limit(str(user_id))
@@ -137,18 +234,25 @@ def attempt_quiz_question(
             question_text=question_row["question"],
         )
         is_correct = feedback_result.is_meaning_correct
+        feedback_text = feedback_result.feedback
+        grammar_note = feedback_result.grammar_note
     else:
-        is_correct = payload.user_answer.strip().lower() == question_row["expected_answer"].strip().lower()
+        is_correct = (
+            payload.user_answer.strip().lower() == question_row["expected_answer"].strip().lower()
+        )
 
-    progress_row = fetch_user_progress_row(user_id)
+    record_attempt_log(user_id, question_row["topic"], is_correct)
 
     if is_correct:
         xp_earned = XP_PER_CORRECT_ANSWER_AI_QUIZ
         add_xp(user_id, xp_earned)
-        hearts_remaining = progress_row["hearts_remaining"]
+        progress_row = fetch_user_progress_row(user_id)
     else:
         xp_earned = 0
-        hearts_remaining = apply_heart_loss(user_id)
+        try:
+            progress_row = apply_heart_loss(user_id)
+        except HeartsEmptyError:
+            return error_response(HEARTS_EMPTY_CODE)
 
     with _active_quizzes_lock:
         quiz_state["attempts"][str(payload.question_id)] = {
@@ -156,14 +260,12 @@ def attempt_quiz_question(
             "xp_earned": xp_earned,
         }
 
-    from app.models.schemas import AttemptResultOut
-
     result = AttemptResultOut(
         correct=is_correct,
         xp_earned=xp_earned,
-        hearts_remaining=hearts_remaining,
-        feedback=None,
-        grammar_note=None,
+        feedback=feedback_text,
+        grammar_note=grammar_note,
+        **heart_fields(progress_row),
     )
     return success_response(result)
 
@@ -182,8 +284,8 @@ def complete_quiz(quiz_id: UUID, user_id: UUID = Depends(get_current_user_id)) -
     total_xp_earned = sum(a["xp_earned"] for a in quiz_state["attempts"].values())
     akurasi = int((jumlah_benar / total_soal) * 100) if total_soal > 0 else 0
 
-    progress_row = fetch_user_progress_row(user_id)
     badge_earned = check_and_award_badges(user_id)
+    progress_row = fetch_user_progress_row(user_id)
 
     with _active_quizzes_lock:
         _active_quizzes.pop(str(quiz_id), None)
@@ -195,7 +297,7 @@ def complete_quiz(quiz_id: UUID, user_id: UUID = Depends(get_current_user_id)) -
         jumlah_salah=jumlah_salah,
         akurasi=akurasi,
         total_xp_earned=total_xp_earned,
-        hearts_remaining=progress_row["hearts_remaining"],
         badge_earned=badge_earned,
+        **heart_fields(progress_row),
     )
     return success_response(result)

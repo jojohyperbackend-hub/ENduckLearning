@@ -67,6 +67,15 @@ class BadgeOut(BaseModel):
     earned_at: datetime
 
 
+class HeartStateOut(BaseModel):
+    # Sisa detik sampai tiap heart yang hilang balik lagi (urut dari yang paling cepat).
+    # Dihitung di server pakai jam UTC; frontend cuma hitung mundur sendiri.
+    hearts_remaining: int
+    heart_max: int = 5
+    heart_regen_in_seconds: List[int] = Field(default_factory=list)
+    next_heart_in_seconds: Optional[int] = None
+
+
 class CourseOut(BaseModel):
     course_id: UUID
     title: str
@@ -97,12 +106,11 @@ class ExercisePublicOut(BaseModel):
     options: Optional[List[str]] = None
 
 
-class LessonDetailOut(BaseModel):
+class LessonDetailOut(HeartStateOut):
     lesson_id: UUID
     unit_id: UUID
     order_index: int
     xp_reward_base: int
-    hearts_remaining: int
     exercises: List[ExercisePublicOut]
 
 
@@ -116,25 +124,22 @@ class AttemptTranslateRequest(BaseModel):
     user_answer: str = Field(..., min_length=1)
 
 
-class AttemptResultOut(BaseModel):
+class AttemptResultOut(HeartStateOut):
     correct: bool
     xp_earned: int
-    hearts_remaining: int
     feedback: Optional[str] = None
     grammar_note: Optional[str] = None
 
 
-class LessonCompleteResultOut(BaseModel):
+class LessonCompleteResultOut(HeartStateOut):
     xp_earned_total: int
-    hearts_remaining: int
     badge_earned: Optional[BadgeOut] = None
 
 
-class ProgressOut(BaseModel):
+class ProgressOut(HeartStateOut):
     user_id: UUID
     total_xp: int
     current_streak: int
-    hearts_remaining: int
     current_lesson_id: Optional[UUID] = None
     badges: List[BadgeOut] = Field(default_factory=list)
 
@@ -157,7 +162,11 @@ class QuizFormRequest(BaseModel):
     tingkat_kesulitan: TingkatKesulitanLiteral = "sama_kayak_terakhir"
 
 
-class QuizFormOptionsOut(BaseModel):
+class QuizFormOptionsOut(HeartStateOut):
+    # Gerbang 1: minimal 1 lesson pernah selesai. Kalau belum, form gak boleh dibuka.
+    gate1_passed: bool
+    gate1_message: Optional[str] = None
+    # Topik manual cuma dari unit yang sudah terbuka buat user ini.
     available_topics: List[str]
     tipe_soal_options: List[str] = Field(
         default_factory=lambda: ["multiple_choice", "fill_blank", "translate", "campur"]
@@ -170,6 +179,7 @@ class QuizFormOptionsOut(BaseModel):
 class QuizQuestionItemOut(BaseModel):
     question_id: UUID
     type: TipeSoalConcreteLiteral
+    topic: str
     question_text: str
     options: Optional[List[str]] = None
     source: QuestionSourceLiteral
@@ -189,14 +199,13 @@ class QuizAttemptRequest(BaseModel):
     user_answer: str = Field(..., min_length=1)
 
 
-class QuizCompleteResultOut(BaseModel):
+class QuizCompleteResultOut(HeartStateOut):
     quiz_id: UUID
     total_soal: int
     jumlah_benar: int
     jumlah_salah: int
     akurasi: int
     total_xp_earned: int
-    hearts_remaining: int
     badge_earned: Optional[BadgeOut] = None
 
 
@@ -250,7 +259,7 @@ class AiCallLogEntry(BaseModel):
     berhasil: bool
     alasan_gagal: Optional[RejectionReasonCategory] = None
     token_used: int = Field(..., ge=0)
-    temperature_used: float = Field(..., ge=0.0, le=0.2)
+    temperature_used: float = Field(..., ge=0.0, le=1.0)
     lama_proses_ms: int = Field(..., ge=0)
 
     @model_validator(mode="after")

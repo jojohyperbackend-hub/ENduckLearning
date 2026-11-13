@@ -13,7 +13,15 @@ from app.models.schemas import (
     ReviewQueueItemOut,
 )
 from app.services.ai_service import generate_translate_feedback
-from app.services.progress_service import add_xp, apply_heart_loss, fetch_user_progress_row
+from app.services.progress_service import (
+    HEARTS_EMPTY_CODE,
+    HeartsEmptyError,
+    add_xp,
+    apply_heart_loss,
+    fetch_user_progress_row,
+    heart_fields,
+    require_hearts,
+)
 from app.utils.cache import RateLimitExceeded, check_translate_attempt_rate_limit
 from app.utils.helpers import error_response, success_response
 
@@ -102,6 +110,12 @@ def attempt_review(
         return error_response(REVIEW_ITEM_TIDAK_DITEMUKAN)
     exercise_row = exercise_result.data[0]
 
+    # Titik C: heart dicek di database sebelum jawaban diproses.
+    try:
+        require_hearts(user_id)
+    except HeartsEmptyError:
+        return error_response(HEARTS_EMPTY_CODE)
+
     if exercise_row["type"] == "translate":
         try:
             check_translate_attempt_rate_limit(str(user_id))
@@ -121,22 +135,23 @@ def attempt_review(
         feedback_text = None
         grammar_note = None
 
-    progress_row = fetch_user_progress_row(user_id)
-
     if is_correct:
         xp_earned = XP_PER_REVIEW_CORRECT
         add_xp(user_id, xp_earned)
-        hearts_remaining = progress_row["hearts_remaining"]
         client.table("review_queue").delete().eq("review_id", str(payload.review_id)).execute()
+        progress_row = fetch_user_progress_row(user_id)
     else:
         xp_earned = 0
-        hearts_remaining = apply_heart_loss(user_id)
+        try:
+            progress_row = apply_heart_loss(user_id)
+        except HeartsEmptyError:
+            return error_response(HEARTS_EMPTY_CODE)
 
     result = AttemptResultOut(
         correct=is_correct,
         xp_earned=xp_earned,
-        hearts_remaining=hearts_remaining,
         feedback=feedback_text,
         grammar_note=grammar_note,
+        **heart_fields(progress_row),
     )
     return success_response(result)

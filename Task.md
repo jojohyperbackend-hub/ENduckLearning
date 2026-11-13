@@ -1,1 +1,0 @@
-- Navbar gw fix biar gak kedap kedip ketika gw 

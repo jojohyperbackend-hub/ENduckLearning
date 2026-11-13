@@ -61,7 +61,7 @@ class AiAttemptFailed(Exception):
 
 
 def _call_openrouter_raw(
-    system_prompt: str, user_prompt: str, max_tokens: int
+    system_prompt: str, user_prompt: str, max_tokens: int, temperature: float = 0.0
 ) -> Tuple[str, int, int]:
     headers = {
         "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
@@ -73,7 +73,7 @@ def _call_openrouter_raw(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "temperature": 0,
+        "temperature": temperature,
         "frequency_penalty": 0.3,
         "max_tokens": max_tokens,
     }
@@ -97,15 +97,37 @@ def _call_openrouter_raw(
     return content, token_used, elapsed_ms
 
 
-def _resolve_topics(fokus_topik: str, weak_topics: List[str], all_topics: List[str]) -> List[str]:
+MIN_ATTEMPTS_FOR_AUTO_TOPIC = 3
+MAX_AUTO_TOPICS = 3
+
+TopicStatistics = Tuple[Dict[str, float], Dict[str, int], List[str]]
+
+
+def eligible_auto_topics(topic_scores: Dict[str, float], jumlah_data_per_topic: Dict[str, int]) -> List[str]:
+    """Topik yang riwayatnya cukup buat mode Otomatis (minimal 3x percobaan), skor tertinggi dulu."""
+    eligible = [
+        topic
+        for topic, jumlah in jumlah_data_per_topic.items()
+        if jumlah >= MIN_ATTEMPTS_FOR_AUTO_TOPIC
+    ]
+    eligible.sort(key=lambda topic: topic_scores.get(topic, 0.0), reverse=True)
+    return eligible
+
+
+def _resolve_topics(
+    fokus_topik: str,
+    weak_topics: List[str],
+    topic_scores: Dict[str, float],
+    jumlah_data_per_topic: Dict[str, int],
+) -> List[str]:
     if fokus_topik != "auto":
         return [fokus_topik]
     if weak_topics:
         return weak_topics
-    return all_topics[:3]
+    return eligible_auto_topics(topic_scores, jumlah_data_per_topic)[:MAX_AUTO_TOPICS]
 
 
-def _fetch_topic_statistics(user_id: UUID) -> Tuple[Dict[str, float], Dict[str, int], List[str]]:
+def fetch_topic_statistics(user_id: UUID) -> TopicStatistics:
     client = get_service_client()
     result = (
         client.table("attempt_log")
@@ -190,18 +212,40 @@ def _fetch_recent_questions_for_topic(topic: str) -> List[str]:
     return [row["question"] for row in result.data]
 
 
-def _build_fallback_question(topic: str) -> Optional[Dict[str, Any]]:
+def _build_fallback_question(
+    topic: str, used_exercise_ids: Optional[set] = None, used_questions: Optional[List[str]] = None
+) -> Optional[Dict[str, Any]]:
+    """Ambil soal dari bank soal buat topik ini. Ambil banyak kandidat dan skip yang
+    udah dipakai di batch generate yang sama, biar gak ada fallback yang kebetulan sama
+    persis dua kali (dulu ini cuma .limit(1), jadi selalu balikin baris pertama terus)."""
+    used_exercise_ids = used_exercise_ids or set()
+    used_questions = used_questions or []
+
     client = get_service_client()
     result = (
         client.table("exercise")
         .select("exercise_id, type, topic, question, options, expected_answer")
         .eq("topic", topic)
-        .limit(1)
+        .limit(20)
         .execute()
     )
-    if not result.data:
+    candidates = result.data
+    if not candidates:
         return None
-    row = result.data[0]
+
+    row = next(
+        (
+            c
+            for c in candidates
+            if c["exercise_id"] not in used_exercise_ids and c["question"] not in used_questions
+        ),
+        None,
+    )
+    if row is None:
+        # Semua kandidat yang ketarik udah kepakai di batch ini, gak ada pilihan lain
+        # di bank soal buat topik ini -> terpaksa ulang, lebih baik daripada gak ada soal sama sekali.
+        row = candidates[0]
+
     return {
         "exercise_id": row["exercise_id"],
         "type": row["type"],
@@ -242,18 +286,32 @@ def _generate_one_question(
         "expected_answer, based_on_pattern. Jangan beri komentar tambahan apapun di luar JSON."
     )
     tipe_instruksi = tipe_soal if tipe_soal != "campur" else "multiple_choice, fill_blank, atau translate"
+    already_generated_note = (
+        f"Soal-soal yang SUDAH dibuat di batch ini, JANGAN dibuat ulang atau diparafrase mirip: "
+        f"{' | '.join(existing_questions[-10:])}\n"
+        if existing_questions
+        else ""
+    )
     user_prompt = (
         f"Topik: {topic}\n"
         f"Tingkat kesulitan relatif: {tingkat_kesulitan}\n"
         f"Tipe soal yang diinginkan: {tipe_instruksi}\n"
         f"Konteks referensi dari bank soal (jangan diduplikasi persis): {topic_context}\n"
-        "Buat satu soal baru yang original, relevan dengan topik, dan edukatif."
+        f"{already_generated_note}"
+        "Buat satu soal baru yang original, relevan dengan topik, dan edukatif. "
+        "Variasikan kalimat, angka, nama, atau skenario dari soal-soal sebelumnya."
     )
 
     for attempt_number in range(1, MAX_GENERATION_ATTEMPTS + 1):
         max_tokens = calculate_max_tokens(1)
+        # Begitu ada percobaan ulang (karena duplikat/invalid) atau topik ini udah
+        # punya soal lain di batch yang sama, naikkan temperature biar hasilnya gak
+        # ngulang jawaban deterministik yang sama kayak sebelumnya.
+        call_temperature = 0.0 if attempt_number == 1 and not existing_questions else 0.7
         try:
-            content, token_used, elapsed_ms = _call_openrouter_raw(system_prompt, user_prompt, max_tokens)
+            content, token_used, elapsed_ms = _call_openrouter_raw(
+                system_prompt, user_prompt, max_tokens, temperature=call_temperature
+            )
         except AiTechnicalFailure as exc:
             call_logs.append(
                 AiCallLogEntry(
@@ -262,7 +320,7 @@ def _generate_one_question(
                     berhasil=False,
                     alasan_gagal="ai_error_teknis",
                     token_used=0,
-                    temperature_used=0.0,
+                    temperature_used=call_temperature,
                     lama_proses_ms=0,
                 )
             )
@@ -278,7 +336,7 @@ def _generate_one_question(
                     berhasil=False,
                     alasan_gagal="format_tidak_valid",
                     token_used=token_used,
-                    temperature_used=0.0,
+                    temperature_used=call_temperature,
                     lama_proses_ms=elapsed_ms,
                 )
             )
@@ -292,7 +350,7 @@ def _generate_one_question(
                     berhasil=False,
                     alasan_gagal="placeholder_terdeteksi",
                     token_used=token_used,
-                    temperature_used=0.0,
+                    temperature_used=call_temperature,
                     lama_proses_ms=elapsed_ms,
                 )
             )
@@ -308,7 +366,7 @@ def _generate_one_question(
                     berhasil=False,
                     alasan_gagal="format_tidak_valid",
                     token_used=token_used,
-                    temperature_used=0.0,
+                    temperature_used=call_temperature,
                     lama_proses_ms=elapsed_ms,
                 )
             )
@@ -322,7 +380,7 @@ def _generate_one_question(
                     berhasil=False,
                     alasan_gagal="duplikat_soal",
                     token_used=token_used,
-                    temperature_used=0.0,
+                    temperature_used=call_temperature,
                     lama_proses_ms=elapsed_ms,
                 )
             )
@@ -338,7 +396,7 @@ def _generate_one_question(
                     berhasil=False,
                     alasan_gagal="jawaban_tidak_masuk_akal",
                     token_used=token_used,
-                    temperature_used=0.0,
+                    temperature_used=call_temperature,
                     lama_proses_ms=elapsed_ms,
                 )
             )
@@ -355,7 +413,7 @@ def _generate_one_question(
                     berhasil=False,
                     alasan_gagal="grounding_gagal",
                     token_used=token_used,
-                    temperature_used=0.0,
+                    temperature_used=call_temperature,
                     lama_proses_ms=elapsed_ms,
                 )
             )
@@ -371,7 +429,7 @@ def _generate_one_question(
                         berhasil=False,
                         alasan_gagal="grounding_gagal",
                         token_used=token_used,
-                        temperature_used=0.0,
+                        temperature_used=call_temperature,
                         lama_proses_ms=elapsed_ms,
                     )
                 )
@@ -384,7 +442,7 @@ def _generate_one_question(
                 berhasil=True,
                 alasan_gagal=None,
                 token_used=token_used,
-                temperature_used=0.0,
+                temperature_used=call_temperature,
                 lama_proses_ms=elapsed_ms,
             )
         )
@@ -394,18 +452,24 @@ def _generate_one_question(
 
 
 def generate_practice(
-    user_id: UUID, jumlah_soal: int, tipe_soal: str, fokus_topik: str, tingkat_kesulitan: str
+    user_id: UUID,
+    jumlah_soal: int,
+    tipe_soal: str,
+    fokus_topik: str,
+    tingkat_kesulitan: str,
+    topic_statistics: Optional[TopicStatistics] = None,
 ) -> Tuple[List[Dict[str, Any]], str]:
-    topic_scores, jumlah_data_per_topic, all_topics = _fetch_topic_statistics(user_id)
+    topic_scores, jumlah_data_per_topic, _ = topic_statistics or fetch_topic_statistics(user_id)
     weak_topics = determine_weak_topics(topic_scores, jumlah_data_per_topic)
     _persist_topic_scores(user_id, topic_scores, jumlah_data_per_topic, weak_topics)
 
-    resolved_topics = _resolve_topics(fokus_topik, weak_topics, all_topics)
+    resolved_topics = _resolve_topics(fokus_topik, weak_topics, topic_scores, jumlah_data_per_topic)
     if not resolved_topics:
-        resolved_topics = ["general"]
+        return [], "partial"
 
     questions: List[Dict[str, Any]] = []
     existing_questions_text: List[str] = []
+    used_fallback_exercise_ids: set = set()
     total_tokens_estimate = 0
 
     for index in range(jumlah_soal):
@@ -415,10 +479,12 @@ def generate_practice(
         try:
             check_and_add_daily_token_usage(str(user_id), calculate_max_tokens(1))
         except Exception:
-            fallback = _build_fallback_question(topic)
+            fallback = _build_fallback_question(topic, used_fallback_exercise_ids, existing_questions_text)
             if fallback is not None:
                 fallback["source"] = "fallback_original"
                 questions.append(fallback)
+                used_fallback_exercise_ids.add(fallback["exercise_id"])
+                existing_questions_text.append(fallback["question"])
             continue
 
         generated, call_logs = _generate_one_question(
@@ -428,10 +494,12 @@ def generate_practice(
             total_tokens_estimate += log_entry.token_used
 
         if generated is None:
-            fallback = _build_fallback_question(topic)
+            fallback = _build_fallback_question(topic, used_fallback_exercise_ids, existing_questions_text)
             if fallback is not None:
                 fallback["source"] = "fallback_original"
                 questions.append(fallback)
+                used_fallback_exercise_ids.add(fallback["exercise_id"])
+                existing_questions_text.append(fallback["question"])
             continue
 
         existing_questions_text.append(generated.question)

@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router";
 import { Menu, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { scrollToSection } from "../../App";
+import { useAuth } from "../../hooks/useAuth";
 
 // Nav khusus landing page: scrollspy ke section, sesuai DESIGN.md
 // wireframe desktop ("Beranda Fitur Cara Kerja Tim")
@@ -23,6 +24,7 @@ const APP_LINKS = [
 const Navbar = () => {
   const { pathname } = useLocation();
   const isLandingPage = pathname === "/";
+  const { isAuthenticated, logout } = useAuth();
 
   const [activeSection, setActiveSection] = useState(LANDING_SECTIONS[0].id);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -101,7 +103,7 @@ const Navbar = () => {
     <header>
       <nav className="flex items-center justify-between gap-4 px-4 py-4 text-sm">
         <Link
-          to="/"
+          to={isAuthenticated ? "/dashboard" : "/"}
           className="font-heading text-2xl font-bold tracking-wide text-[var(--color-text)] md:text-display"
           onClick={() => setIsMobileMenuOpen(false)}
         >
@@ -170,12 +172,22 @@ const Navbar = () => {
               })}
         </div>
 
-        <Link
-          to="/login"
-          className="hidden rounded-xl bg-[var(--color-cta)] px-7 py-2 text-body-lg text-[var(--color-text)] transition hover:scale-[1.03] active:scale-[0.98] hover:bg-[var(--color-cta-soft)] shadow-[0_4px_0_rgba(40,60,99,0.8)] motion-reduce:hover:scale-100 md:inline-flex"
-        >
-          Login
-        </Link>
+        {isAuthenticated ? (
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="hidden rounded-xl bg-[var(--color-cta)] px-7 py-2 text-body-lg text-[var(--color-text)] transition hover:scale-[1.03] active:scale-[0.98] hover:bg-[var(--color-cta-soft)] shadow-[0_4px_0_rgba(40,60,99,0.8)] motion-reduce:hover:scale-100 md:inline-flex cursor-pointer"
+          >
+            Keluar
+          </button>
+        ) : (
+          <Link
+            to="/login"
+            className="hidden rounded-xl bg-[var(--color-cta)] px-7 py-2 text-body-lg text-[var(--color-text)] transition hover:scale-[1.03] active:scale-[0.98] hover:bg-[var(--color-cta-soft)] shadow-[0_4px_0_rgba(40,60,99,0.8)] motion-reduce:hover:scale-100 md:inline-flex"
+          >
+            Login
+          </Link>
+        )}
 
         {/* Hamburger: Mobile Kecil - Tablet (<768px), sesuai DESIGN.md Bagian 9 */}
         <button
@@ -234,13 +246,26 @@ const Navbar = () => {
                       </NavLink>
                     );
                   })}
-              <Link
-                to="/login"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="mt-1 rounded-xl bg-[var(--color-cta)] px-4 py-3 text-center text-base font-semibold text-[var(--color-text)] shadow-[0_4px_0_rgba(40,60,99,0.8)] transition active:scale-[0.98]"
-              >
-                Login
-              </Link>
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    void logout();
+                  }}
+                  className="mt-1 rounded-xl bg-[var(--color-cta)] px-4 py-3 text-center text-base font-semibold text-[var(--color-text)] shadow-[0_4px_0_rgba(40,60,99,0.8)] transition active:scale-[0.98] cursor-pointer"
+                >
+                  Keluar
+                </button>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="mt-1 rounded-xl bg-[var(--color-cta)] px-4 py-3 text-center text-base font-semibold text-[var(--color-text)] shadow-[0_4px_0_rgba(40,60,99,0.8)] transition active:scale-[0.98]"
+                >
+                  Login
+                </Link>
+              )}
             </div>
           </motion.div>
         )}
