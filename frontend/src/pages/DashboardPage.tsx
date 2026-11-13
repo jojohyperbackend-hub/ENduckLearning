@@ -1,11 +1,21 @@
-import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Link, useNavigate } from "react-router";
-import { AnimatePresence, motion } from "motion/react";
-import { Award, Flame, Heart, Lock, RotateCcw, Sparkles, Star, Target } from "lucide-react";
+// import { AnimatePresence, motion } from "motion/react";
+import {
+  Award,
+  ArrowRight,
+  Flame,
+  Heart,
+  Lock,
+  RotateCcw,
+  Sparkles,
+  Star,
+  Target,
+} from "lucide-react";
 import Button from "../components/common/Button";
 import Card from "../components/common/Card";
 import HeartsEmptyModal from "../components/common/HeartsEmptyModal";
-import CollapsedProgressBar from "../components/dashboard/CollapsedProgressBar";
+// import CollapsedProgressBar from "../components/dashboard/CollapsedProgressBar";
 import LessonSegments from "../components/dashboard/LessonSegments";
 import SunrisePath from "../components/dashboard/SunrisePath";
 import UnitRow from "../components/dashboard/UnitRow";
@@ -32,10 +42,14 @@ const subscribeToDesktop = (onChange: () => void) => {
   return () => query.removeEventListener("change", onChange);
 };
 const useIsDesktop = () =>
-  useSyncExternalStore(subscribeToDesktop, () => window.matchMedia(DESKTOP_QUERY).matches);
+  useSyncExternalStore(
+    subscribeToDesktop,
+    () => window.matchMedia(DESKTOP_QUERY).matches,
+  );
 
 // Lesson aktif terakhir yang dilihat user, buat tahu kapan ada lesson baru kebuka.
-const lastActiveKey = (userId: string) => `grammarise:last-active-lesson:${userId}`;
+const lastActiveKey = (userId: string) =>
+  `grammarise:last-active-lesson:${userId}`;
 const readLastActive = (userId: string): string | null => {
   try {
     return window.localStorage.getItem(lastActiveKey(userId));
@@ -51,7 +65,13 @@ const writeLastActive = (userId: string, lessonId: string) => {
   }
 };
 
-const StatusStrip = ({ data, clock }: { data: DashboardData; clock: HeartClock }) => {
+const StatusStrip = ({
+  data,
+  clock,
+}: {
+  data: DashboardData;
+  clock: HeartClock;
+}) => {
   const { total_xp, current_streak, badges } = data.progress;
   const hearts = Math.min(Math.max(clock.hearts, 0), MAX_HEARTS);
   const chip =
@@ -60,12 +80,20 @@ const StatusStrip = ({ data, clock }: { data: DashboardData; clock: HeartClock }
   return (
     <ul className="m-0 flex list-none flex-wrap items-center gap-2 p-0">
       <li className={chip}>
-        <Flame size={18} className="text-[var(--color-cta)]" aria-hidden="true" />
+        <Flame
+          size={18}
+          className="text-[var(--color-cta)]"
+          aria-hidden="true"
+        />
         {current_streak} hari
         <span className="sr-only">streak</span>
       </li>
       <li className={chip}>
-        <Star size={18} className="text-[var(--color-cta)]" aria-hidden="true" />
+        <Star
+          size={18}
+          className="text-[var(--color-cta)]"
+          aria-hidden="true"
+        />
         {total_xp.toLocaleString("id-ID")} XP
       </li>
       <li className={chip}>
@@ -95,7 +123,11 @@ const StatusStrip = ({ data, clock }: { data: DashboardData; clock: HeartClock }
       </li>
       {badges.length > 0 && (
         <li className={chip}>
-          <Award size={18} className="text-[var(--color-correct)]" aria-hidden="true" />
+          <Award
+            size={18}
+            className="text-[var(--color-correct)]"
+            aria-hidden="true"
+          />
           {badges.length} badge
         </li>
       )}
@@ -119,7 +151,11 @@ const ContinueCard = ({
   return (
     <Card className="flex flex-col gap-4 p-5 sm:p-7">
       <p className="flex items-center gap-2 font-heading text-card-header font-bold">
-        <Target size={20} className="text-[var(--color-correct)]" aria-hidden="true" />
+        <Target
+          size={20}
+          className="text-[var(--color-correct)]"
+          aria-hidden="true"
+        />
         {nextLesson ? "Lanjut dari sini" : "Jalurnya sudah habis"}
       </p>
 
@@ -226,7 +262,9 @@ const ReviewCard = ({
       <div className="mt-auto flex flex-col gap-3 border-t border-[var(--color-bg-card)]/20 pt-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-heading text-card-header font-bold">Latihan AI</p>
+            <p className="font-heading text-card-header font-bold">
+              Latihan AI
+            </p>
             <p className="text-body text-[var(--color-bg-card)]/85">
               Soal baru buat topik yang masih sering salah.
             </p>
@@ -235,7 +273,11 @@ const ReviewCard = ({
             type="button"
             onClick={() => void openAiPractice()}
             disabled={launch.status === "checking"}
-            aria-describedby={launch.status === "locked" || launch.status === "error" ? "ai-launch-note" : undefined}
+            aria-describedby={
+              launch.status === "locked" || launch.status === "error"
+                ? "ai-launch-note"
+                : undefined
+            }
             className="inline-flex w-fit shrink-0 cursor-pointer items-center gap-2 rounded-full bg-[var(--color-bg-card)] px-5 py-2.5 text-body font-bold text-[var(--color-text)] transition hover:bg-[var(--color-bg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-bg-card)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-80"
           >
             <Sparkles size={16} aria-hidden="true" />
@@ -266,7 +308,11 @@ interface FocusUnitProps {
 }
 
 // Desktop & tablet: panel langit, jalur naik diagonal ke matahari.
-const FocusUnitDesktop = ({ unit, celebrateLessonId, onOpenLesson }: FocusUnitProps) => {
+const FocusUnitDesktop = ({
+  unit,
+  celebrateLessonId,
+  onOpenLesson,
+}: FocusUnitProps) => {
   return (
     <div className="relative mb-2 mr-2 overflow-hidden rounded-3xl shadow-[8px_8px_0_var(--color-cta)]">
       <SunrisePath
@@ -282,7 +328,9 @@ const FocusUnitDesktop = ({ unit, celebrateLessonId, onOpenLesson }: FocusUnitPr
           <span className="mx-2 opacity-60">/</span>
           {unit.isComplete ? "Selesai" : "Sedang dikerjakan"}
         </p>
-        <h3 className="mt-1 font-heading text-3xl font-bold leading-tight">{unit.title}</h3>
+        <h3 className="mt-1 font-heading text-3xl font-bold leading-tight">
+          {unit.title}
+        </h3>
         <p className="mt-1 text-body text-[var(--color-bg-card)]/85">
           {unit.doneCount} dari {unit.lessons.length} lesson selesai
         </p>
@@ -292,67 +340,67 @@ const FocusUnitDesktop = ({ unit, celebrateLessonId, onOpenLesson }: FocusUnitPr
 };
 
 // HP: diringkas jadi satu bar, diketuk baru jalur vertikalnya kebuka.
-const FocusUnitMobile = ({ unit, celebrateLessonId, onOpenLesson }: FocusUnitProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const panelId = useId();
+// const FocusUnitMobile = ({ unit, celebrateLessonId, onOpenLesson }: FocusUnitProps) => {
+//   const [isOpen, setIsOpen] = useState(false);
+//   const containerRef = useRef<HTMLDivElement>(null);
+//   const panelId = useId();
 
-  // Ketuk di luar area = nutup lagi
-  useEffect(() => {
-    if (!isOpen) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [isOpen]);
+//   // Ketuk di luar area = nutup lagi
+//   useEffect(() => {
+//     if (!isOpen) return;
+//     const handlePointerDown = (event: PointerEvent) => {
+//       if (!containerRef.current?.contains(event.target as Node)) {
+//         setIsOpen(false);
+//       }
+//     };
+//     document.addEventListener("pointerdown", handlePointerDown);
+//     return () => document.removeEventListener("pointerdown", handlePointerDown);
+//   }, [isOpen]);
 
-  // Jalurnya panjang: begitu kebuka, langsung geser ke lesson yang lagi aktif
-  useEffect(() => {
-    if (!isOpen) return;
-    const timeoutId = window.setTimeout(() => {
-      containerRef.current
-        ?.querySelector("[data-active-node]")
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 340);
-    return () => window.clearTimeout(timeoutId);
-  }, [isOpen]);
+//   // Jalurnya panjang: begitu kebuka, langsung geser ke lesson yang lagi aktif
+//   useEffect(() => {
+//     if (!isOpen) return;
+//     const timeoutId = window.setTimeout(() => {
+//       containerRef.current
+//         ?.querySelector("[data-active-node]")
+//         ?.scrollIntoView({ behavior: "smooth", block: "center" });
+//     }, 340);
+//     return () => window.clearTimeout(timeoutId);
+//   }, [isOpen]);
 
-  return (
-    <div ref={containerRef}>
-      <Card className="overflow-hidden">
-        <CollapsedProgressBar
-          unit={unit}
-          isOpen={isOpen}
-          onToggle={() => setIsOpen((open) => !open)}
-          panelId={panelId}
-        />
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              id={panelId}
-              initial={{ height: 0 }}
-              animate={{ height: "auto" }}
-              exit={{ height: 0 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="overflow-hidden"
-            >
-              <SunrisePath
-                lessons={unit.lessons}
-                isComplete={unit.isComplete}
-                orientation="vertical"
-                celebrateLessonId={celebrateLessonId}
-                onOpenLesson={onOpenLesson}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Card>
-    </div>
-  );
-};
+//   return (
+//     <div ref={containerRef}>
+//       <Card className="overflow-hidden">
+//         <CollapsedProgressBar
+//           unit={unit}
+//           isOpen={isOpen}
+//           onToggle={() => setIsOpen((open) => !open)}
+//           panelId={panelId}
+//         />
+//         <AnimatePresence initial={false}>
+//           {isOpen && (
+//             <motion.div
+//               id={panelId}
+//               initial={{ height: 0 }}
+//               animate={{ height: "auto" }}
+//               exit={{ height: 0 }}
+//               transition={{ duration: 0.3, ease: "easeOut" }}
+//               className="overflow-hidden"
+//             >
+//               <SunrisePath
+//                 lessons={unit.lessons}
+//                 isComplete={unit.isComplete}
+//                 orientation="vertical"
+//                 celebrateLessonId={celebrateLessonId}
+//                 onOpenLesson={onOpenLesson}
+//               />
+//             </motion.div>
+//           )}
+//         </AnimatePresence>
+//       </Card>
+//     </div>
+//   );
+// };
 
 const DashboardContent = ({ data }: { data: DashboardData }) => {
   const navigate = useNavigate();
@@ -363,7 +411,9 @@ const DashboardContent = ({ data }: { data: DashboardData }) => {
   // Konfeti cuma sekali: pas lesson aktif beda dari kunjungan terakhir.
   const [celebrateLessonId] = useState(() => {
     const previous = readLastActive(progress.user_id);
-    return previous && nextLessonId && previous !== nextLessonId ? nextLessonId : null;
+    return previous && nextLessonId && previous !== nextLessonId
+      ? nextLessonId
+      : null;
   });
   useEffect(() => {
     if (nextLessonId) writeLastActive(progress.user_id, nextLessonId);
@@ -383,7 +433,9 @@ const DashboardContent = ({ data }: { data: DashboardData }) => {
   };
 
   return (
-    <section className={`flex flex-col gap-8 py-8 sm:py-10 ${nextLesson ? "pb-32 md:pb-10" : ""}`}>
+    <section
+      className={`flex flex-col gap-8 py-8 sm:py-10 ${nextLesson ? "pb-32 md:pb-10" : ""}`}
+    >
       <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="font-heading text-[2.5rem] font-extrabold leading-none tracking-tight sm:text-5xl">
@@ -396,34 +448,55 @@ const DashboardContent = ({ data }: { data: DashboardData }) => {
         <StatusStrip data={data} clock={clock} />
       </header>
 
-      <div className={`grid gap-4 ${focusUnit ? "lg:grid-cols-[1.4fr_1fr]" : ""}`}>
+      <div
+        className={`grid gap-4 ${focusUnit ? "lg:grid-cols-[1.4fr_1fr]" : ""}`}
+      >
         {focusUnit && (
-          <ContinueCard data={data} onStart={() => nextLesson && openLesson(nextLesson.lesson_id)} />
+          <ContinueCard
+            data={data}
+            onStart={() => nextLesson && openLesson(nextLesson.lesson_id)}
+          />
         )}
-        <ReviewCard reviewCount={data.reviewCount} onHeartsEmpty={setHeartsModal} />
+        <ReviewCard
+          reviewCount={data.reviewCount}
+          onHeartsEmpty={setHeartsModal}
+        />
       </div>
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-heading text-4xl font-extrabold leading-none">Lesson</h2>
-          {data.courseTitle && <p className="text-body-lg">{data.courseTitle}</p>}
+          <h2 className="font-heading text-4xl font-extrabold leading-none">
+            Lesson
+          </h2>
+          {data.courseTitle && (
+            <p className="text-body-lg">{data.courseTitle}</p>
+          )}
         </div>
 
         {units.length === 0 ? (
           <Card className="p-6 sm:p-8">
-            <p className="font-heading text-card-header font-bold">Belum ada lesson</p>
+            <p className="font-heading text-card-header font-bold">
+              Belum ada lesson
+            </p>
             <p className="mt-1 text-body-lg">
-              Materinya lagi disiapin. Cek lagi nanti, atau coba Latihan AI dulu.
+              Materinya lagi disiapin. Cek lagi nanti, atau coba Latihan AI
+              dulu.
             </p>
           </Card>
         ) : (
           units.map((unit) => {
-            if (unit.unit_id !== focusUnit?.unit_id) {
-              return <UnitRow key={unit.unit_id} unit={unit} onOpenLesson={openLesson} />;
+            const isFocus = unit.unit_id === focusUnit?.unit_id;
+            if (!isFocus || !isDesktop) {
+              return (
+                <UnitRow
+                  key={unit.unit_id}
+                  unit={unit}
+                  onOpenLesson={openLesson}
+                />
+              );
             }
-            const FocusUnit = isDesktop ? FocusUnitDesktop : FocusUnitMobile;
             return (
-              <FocusUnit
+              <FocusUnitDesktop
                 key={unit.unit_id}
                 unit={unit}
                 celebrateLessonId={celebrateLessonId}
@@ -432,23 +505,38 @@ const DashboardContent = ({ data }: { data: DashboardData }) => {
             );
           })
         )}
+        {units.length > 0 && (
+          <Link
+            to="/lessons"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-cta)] px-7 py-3 text-body-lg font-semibold text-[var(--color-text)] shadow-[0_4px_0_rgba(40,60,99,0.8)] transition active:translate-y-[2px] active:shadow-[0_2px_0_rgba(40,60,99,0.8)] md:hidden"
+          >
+            Lihat jalur belajar
+            <ArrowRight size={20} aria-hidden="true" />
+          </Link>
+        )}
       </div>
 
-      {nextLesson && focusUnit && (
+      {/* {nextLesson && focusUnit && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-[var(--color-text)] bg-[var(--color-bg-card)] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
           <Button fullwidth onClick={() => openLesson(nextLesson.lesson_id)}>
             Mulai Lesson {nextLesson.number}, +{nextLesson.xp_reward_base} XP
           </Button>
         </div>
-      )}
+      )} */}
 
-      {heartsModal && <HeartsEmptyModal snapshot={heartsModal} onConfirm={closeHeartsModal} />}
+      {heartsModal && (
+        <HeartsEmptyModal snapshot={heartsModal} onConfirm={closeHeartsModal} />
+      )}
     </section>
   );
 };
 
 const DashboardSkeleton = () => (
-  <section className="flex flex-col gap-8 py-8 sm:py-10" role="status" aria-label="Memuat dashboard">
+  <section
+    className="flex flex-col gap-8 py-8 sm:py-10"
+    role="status"
+    aria-label="Memuat dashboard"
+  >
     <div className="skeleton h-12 w-64 rounded-xl bg-[var(--color-text)]/10" />
     <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
       <div className="skeleton h-56 rounded-2xl bg-[var(--color-bg-card)]" />
@@ -467,7 +555,9 @@ const DashboardPage = () => {
     return (
       <section className="py-10">
         <Card className="mx-auto flex max-w-xl flex-col items-start gap-4 p-6 sm:p-8">
-          <h1 className="font-heading text-heading font-bold">Dashboard gagal dimuat</h1>
+          <h1 className="font-heading text-heading font-bold">
+            Dashboard gagal dimuat
+          </h1>
           <p className="text-body-lg">{state.message}</p>
           <Button onClick={retry}>Coba lagi</Button>
         </Card>
@@ -475,7 +565,9 @@ const DashboardPage = () => {
     );
   }
 
-  return <DashboardContent key={state.data.progress.user_id} data={state.data} />;
+  return (
+    <DashboardContent key={state.data.progress.user_id} data={state.data} />
+  );
 };
 
 export default DashboardPage;
