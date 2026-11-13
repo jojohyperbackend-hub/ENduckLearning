@@ -12,7 +12,7 @@ HEARTS_MAX = 5
 
 # 1 heart balik 4 menit setelah heart itu hilang. Dihitung pakai jam server (UTC),
 # jadi tetap jalan walau app ditutup dan gak bisa dicurangi dengan ubah jam device.
-HEART_REGEN_SECONDS = 240
+HEART_REGEN_SECONDS = 1080
 
 HEARTS_EMPTY_CODE = "HEARTS_EMPTY"
 
