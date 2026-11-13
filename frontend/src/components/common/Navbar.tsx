@@ -6,6 +6,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { Heart, Menu, Star, X } from "lucide-react";
 import { useHeartClock } from "../../hooks/useHeartClock";
 import { useDashboard, type DashboardData } from "../../hooks/useDashboard";
+import LogoGramarise from "../../assets/Logo-row-cropped.svg"
 
 // Nav khusus landing page: scrollspy ke section, sesuai DESIGN.md
 // wireframe desktop ("Beranda Fitur Cara Kerja Tim")
@@ -139,10 +140,14 @@ const Navbar = () => {
       <nav className="flex items-center justify-between gap-4 px-4 py-4 text-sm">
         <Link
           to={isAuthenticated ? "/dashboard" : "/"}
-          className="font-heading text-2xl font-bold tracking-wide text-[var(--color-text)] md:text-display"
+          className="flex items-center font-heading text-2xl font-bold tracking-wide text-[var(--color-text)] md:text-display"
           onClick={() => setIsMobileMenuOpen(false)}
         >
-          Grammarise
+          <img
+            src={LogoGramarise}
+            alt="Logo Web"
+            className="h-8 w-auto max-w-[160px] object-contain md:h-10 md:max-w-[180px]"
+          />
         </Link>
 
         {/* Nav penuh: Laptop Kecil (≥768px) ke atas, sesuai DESIGN.md Bagian 9 */}
