@@ -19,6 +19,10 @@ import Footer from "./components/landing/Footer";
 import { useAuth } from "./hooks/useAuth";
 import LoadingSpinner from "./components/common/LoadingSpinner";
 import { FloatingWords } from "./components/common/FloatingWords";
+import ProfilePage from "./pages/ProfilePage";
+import BottomNav from "./components/common/BottomNav";
+import LessonDetailPage from "./pages/LessonDetailPage";
+import CloudLayer from "./components/common/CloudLayer";
 import CheatToast from "./components/common/CheatToast";
 import { useXpCheat } from "./hooks/useXpCheat";
 
@@ -104,28 +108,31 @@ const useSmoothScroll = () => {
 };
 
 const AppLayout = () => {
-  const location = useLocation();
   const { status } = useAuth();
+  const location = useLocation();
+  const isLessonPlay = location.pathname.startsWith("/lesson/");
   const cheatNotice = useXpCheat(status === "authenticated");
   const showOnLanding = location.pathname === "/";
   // Navbar tampil di landing dan halaman app. Login & lesson punya header sendiri.
-  const showNavbar =
-    location.pathname !== "/login" && !location.pathname.startsWith("/lesson");
+  const showNavbar = location.pathname !== "/login" && !isLessonPlay;
   const showFloatingWords =
-    location.pathname === "/" ||
-    location.pathname === "/login" ||
-    location.pathname.startsWith("/lesson");
+    location.pathname === "/" || location.pathname === "/login" || isLessonPlay;
+  const showBottomNav =
+    status === "authenticated" &&
+    location.pathname !== "/login" &&
+    !location.pathname.startsWith("/lesson/");
 
   return (
     <div className="grid-bg relative isolate min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
       <CheatToast notice={cheatNotice} />
       {showFloatingWords && <FloatingWords />}
+      <CloudLayer />
       {/* Sticky cuma di landing. Di halaman app navbar ikut scroll biar gak numpuk di atas kartu. */}
       <div className={showOnLanding ? "sticky top-0 z-50" : "relative z-50"}>
         {showNavbar && <Navbar />}
       </div>
 
-      <main className="min-h-screen flex flex-col justify-center mx-auto max-w-7xl px-4">
+      <main className="min-h-screen flex flex-col justify-center mx-auto max-w-7xl px-4 pb-24 md:pb-0">
         <Routes>
           <Route
             path="/"
@@ -175,10 +182,26 @@ const AppLayout = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/lessons"
+            element={
+              <ProtectedRoute>
+                <LessonDetailPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-
+      {showBottomNav && <BottomNav />}
       {showOnLanding && <Footer />}
     </div>
   );

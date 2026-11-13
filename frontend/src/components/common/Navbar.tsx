@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
-import { Menu, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { scrollToSection } from "../../App";
 import { useAuth } from "../../hooks/useAuth";
+import { Heart, Menu, Star, X } from "lucide-react";
+import { useHeartClock } from "../../hooks/useHeartClock";
+import { useDashboard, type DashboardData } from "../../hooks/useDashboard";
+import LogoGramarise from "../../assets/Logo-row-cropped.svg"
 
 // Nav khusus landing page: scrollspy ke section, sesuai DESIGN.md
 // wireframe desktop ("Beranda Fitur Cara Kerja Tim")
@@ -20,6 +23,36 @@ const APP_LINKS = [
   { to: "/progress", label: "Progress" },
   { to: "/quiz/generate", label: "Quiz AI", match: "/quiz" },
 ];
+
+const HeaderStatsReady = ({ data }: { data: DashboardData }) => {
+  const clock = useHeartClock(data.hearts);
+
+  const chip =
+    "flex items-center gap-1.5 rounded-full bg-[var(--color-bg-card)] px-3 py-1.5 text-body-sm font-semibold";
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={chip}>
+        <Heart
+          size={15}
+          className="fill-[var(--color-cta)] text-[var(--color-cta)]"
+          aria-hidden="true"
+        />
+        {Math.min(Math.max(clock.hearts, 0), 5)}
+      </span>
+      <span className={chip}>
+        <Star size={15} className="text-[var(--color-cta)]" aria-hidden="true" />
+        {data.progress.total_xp.toLocaleString("id-ID")} XP
+      </span>
+    </div>
+  );
+};
+
+const HeaderStats = () => {
+  const { state } = useDashboard();
+  if (state.status !== "ready") return null;
+  return <HeaderStatsReady data={state.data} />;
+};
 
 const Navbar = () => {
   const { pathname } = useLocation();
@@ -92,22 +125,29 @@ const Navbar = () => {
     };
   }, [isLandingPage]);
 
-  const handleSectionClick = (sectionId: string) => (event: React.MouseEvent) => {
-    event.preventDefault();
-    setActiveSection(sectionId);
-    setIsMobileMenuOpen(false);
-    scrollToSection(sectionId);
-  };
+  const handleSectionClick =
+    (sectionId: string) => (event: React.MouseEvent) => {
+      event.preventDefault();
+      setActiveSection(sectionId);
+      setIsMobileMenuOpen(false);
+      scrollToSection(sectionId);
+    };
+
+  const showStats = isAuthenticated && !isLandingPage && pathname !== "/login";
 
   return (
-    <header>
+    <header className="bg-[var(--color-bg-card)]">
       <nav className="flex items-center justify-between gap-4 px-4 py-4 text-sm">
         <Link
           to={isAuthenticated ? "/dashboard" : "/"}
-          className="font-heading text-2xl font-bold tracking-wide text-[var(--color-text)] md:text-display"
+          className="flex items-center font-heading text-2xl font-bold tracking-wide text-[var(--color-text)] md:text-display"
           onClick={() => setIsMobileMenuOpen(false)}
         >
-          Grammarise
+          <img
+            src={LogoGramarise}
+            alt="Logo Web"
+            className="h-8 w-auto max-w-[160px] object-contain md:h-10 md:max-w-[180px]"
+          />
         </Link>
 
         {/* Nav penuh: Laptop Kecil (≥768px) ke atas, sesuai DESIGN.md Bagian 9 */}
@@ -130,7 +170,11 @@ const Navbar = () => {
                       <motion.span
                         layoutId="nav-active-pill"
                         className="absolute inset-0 -z-10 rounded-full bg-cta/20"
-                        transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 350,
+                          damping: 30,
+                        }}
                       />
                     )}
                     {section.label}
@@ -138,7 +182,9 @@ const Navbar = () => {
                 );
               })
             : APP_LINKS.map((link) => {
-                const manualActive = link.match ? pathname.startsWith(link.match) : false;
+                const manualActive = link.match
+                  ? pathname.startsWith(link.match)
+                  : false;
 
                 return (
                   <NavLink
@@ -159,7 +205,11 @@ const Navbar = () => {
                           <motion.span
                             layoutId="nav-active-pill"
                             className="absolute inset-0 -z-10 rounded-full bg-cta/20"
-                            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 350,
+                              damping: 30,
+                            }}
                           />
                           {link.label}
                         </>
@@ -171,6 +221,12 @@ const Navbar = () => {
                 );
               })}
         </div>
+
+        {showStats && (
+          <div className="md:hidden">
+            <HeaderStats />
+          </div>
+        )}
 
         {isAuthenticated ? (
           <button
@@ -190,15 +246,17 @@ const Navbar = () => {
         )}
 
         {/* Hamburger: Mobile Kecil - Tablet (<768px), sesuai DESIGN.md Bagian 9 */}
-        <button
-          type="button"
-          onClick={() => setIsMobileMenuOpen((open) => !open)}
-          aria-label={isMobileMenuOpen ? "Tutup menu" : "Buka menu"}
-          aria-expanded={isMobileMenuOpen}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#283c63]/15 bg-[var(--color-bg-card)] text-[var(--color-text)] shadow-[0_8px_20px_rgba(40,60,99,0.12)] transition active:scale-[0.95] md:hidden"
-        >
-          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        {!isAuthenticated && (
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen((open) => !open)}
+            aria-label={isMobileMenuOpen ? "Tutup menu" : "Buka menu"}
+            aria-expanded={isMobileMenuOpen}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#283c63]/15 bg-[var(--color-bg-card)] text-[var(--color-text)] shadow-[0_8px_20px_rgba(40,60,99,0.12)] transition active:scale-[0.95] md:hidden"
+          >
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        )}
       </nav>
 
       <AnimatePresence>
@@ -227,7 +285,9 @@ const Navbar = () => {
                     </a>
                   ))
                 : APP_LINKS.map((link) => {
-                    const manualActive = link.match ? pathname.startsWith(link.match) : false;
+                    const manualActive = link.match
+                      ? pathname.startsWith(link.match)
+                      : false;
                     return (
                       <NavLink
                         key={link.to}
