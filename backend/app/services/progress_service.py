@@ -12,7 +12,7 @@ HEARTS_MAX = 5
 
 # 1 heart balik 4 menit setelah heart itu hilang. Dihitung pakai jam server (UTC),
 # jadi tetap jalan walau app ditutup dan gak bisa dicurangi dengan ubah jam device.
-HEART_REGEN_SECONDS = 1080
+HEART_REGEN_SECONDS = 240
 
 HEARTS_EMPTY_CODE = "HEARTS_EMPTY"
 
@@ -232,15 +232,15 @@ def apply_heart_loss(user_id: UUID) -> Dict[str, Any]:
             raise HeartsEmptyError()
 
         now = utcnow()
-        pending = [
-            timestamp
-            for timestamp in (_parse_timestamp(item) for item in row["heart_regen_timestamps"])
-            if timestamp
-        ]
-        pending.append(now + timedelta(seconds=HEART_REGEN_SECONDS))
-        pending.sort()
-        serialized = _serialize_timestamps(pending)
         new_hearts = current_hearts - 1
+
+        #hitung berapa total heart yang sedang kosong
+        missing_count = HEARTS_MAX - new_hearts
+        pending = [
+            now + timedelta(seconds=HEART_REGEN_SECONDS * (i + 1))
+            for i in range(missing_count)
+        ]
+        serialized = _serialize_timestamps(pending)
 
         result = (
             client.table("user_progress")
