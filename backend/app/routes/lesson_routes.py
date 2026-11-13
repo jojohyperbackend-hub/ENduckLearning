@@ -14,13 +14,8 @@ from app.models.schemas import (
     LessonCompleteResultOut,
     LessonDetailOut,
 )
-<<<<<<< HEAD
 from app.services.ai_service import generate_translate_feedback
 # from app.services.milestone_service import check_and_award_badges
-=======
-from app.services.grading_service import grade_short_answer, grade_translation
-from app.services.milestone_service import check_and_award_badges
->>>>>>> 8e999ad4258e18f10cfd5287ac868e2377467d3e
 from app.services.progress_service import (
     HEARTS_EMPTY_CODE,
     HeartsEmptyError,
