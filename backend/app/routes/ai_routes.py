@@ -57,6 +57,7 @@ GENERATE_GAGAL_BY_REASON = {
     "ai_unreachable": "AI lagi gak bisa dihubungi, jadi soal belum bisa dibuat. Coba lagi beberapa saat lagi.",
     "timeout": "AI kelamaan nyusun soal. Coba lagi, atau kurangi jumlah soalnya.",
     "rejected": "Soal buatan AI belum ada yang lolos cek kualitas. Coba lagi, atau pilih tipe soal lain.",
+    "quota": "Jatah AI kamu hari ini gak cukup buat jumlah soal segini. Coba pilih jumlah soal lebih sedikit, atau lanjut besok.",
 }
 
 _active_quizzes: Dict[str, Dict[str, Any]] = {}

@@ -44,6 +44,10 @@ AI_PRACTICE_MIN_XP = 10
 # Semua soal dibikin barengan (paralel), dengan batas waktu total biar user gak nunggu lama.
 GENERATION_DEADLINE_SECONDS = 40.0
 MAX_PARALLEL_GENERATIONS = 10
+# Soal yang gagal dicoba lagi di ronde berikutnya selama waktunya masih cukup.
+MAX_GENERATION_ROUNDS = 4
+MIN_SECONDS_FOR_NEW_ROUND = 6.0
+EXTRA_SLOTS_PER_MISSING = 2
 MAX_GENERATION_ATTEMPTS = 3
 AI_CALL_TIMEOUT_SECONDS = 30.0
 # Batas bawah max_tokens tiap panggilan, biar jawaban gak kepotong jadi kosong.
@@ -119,6 +123,16 @@ def _normalize_generated_json(parsed: Dict[str, Any]) -> Dict[str, Any]:
     for field in ("question", "expected_answer", "based_on_pattern"):
         if fixed.get(field) is not None:
             fixed[field] = str(fixed[field]).strip()
+    if fixed["type"] == "fill_blank" and fixed.get("question"):
+        # Tempat kosong bisa ditulis "__", "_____", "...", atau "[blank]". Disamain jadi "___".
+        fixed["question"] = re.sub(
+            r"_{2,}|\u2026|\.{3,}|\[\s*blank\s*\]|\(\s*blank\s*\)",
+            "___",
+            fixed["question"],
+            flags=re.IGNORECASE,
+        )
+    if isinstance(fixed.get("expected_answer"), list):
+        fixed["expected_answer"] = " | ".join(str(item).strip() for item in fixed["expected_answer"])
     if not fixed.get("based_on_pattern") or len(fixed["based_on_pattern"]) < 5:
         fixed["based_on_pattern"] = "pola materi lesson"
     return fixed
@@ -340,8 +354,16 @@ SCENARIO_POOL: List[str] = [
     "hari pertama kerja",
 ]
 
-PATTERN_SIMILARITY_LIMIT = 72.0
-BATCH_SIMILARITY_LIMIT = 80.0
+# Batas mirip dihitung dari kata isi soal (lihat _comparable_text). Soal yang cuma ganti
+# 1-2 kata dari soal lain skornya 85 ke atas, soal dengan pola sama tapi isi beda di bawah 80.
+PATTERN_SIMILARITY_LIMIT = 85.0
+BATCH_SIMILARITY_LIMIT = 85.0
+
+# Kata yang gak ngebedain isi soal, dibuang sebelum dibandingin.
+_FILLER_WORDS = frozenset(
+    {"a", "an", "the", "to", "of", "in", "on", "at", "for", "and", "or",
+     "yang", "di", "ke", "dari", "dan", "itu", "ini"}
+)
 
 _QUOTE_CHARS = "'\"‘’“” "
 
@@ -357,6 +379,19 @@ def _core_sentence(question: str) -> str:
     return re.sub(r"\s+", " ", core.strip().strip(_QUOTE_CHARS)).lower()
 
 
+def _comparable_text(text: str) -> str:
+    """Kata isi soal yang dibandingin buat cek kembar.
+
+    Soal isian dan terjemahan polanya emang sama kayak soal lesson ("___ (go) ... every day",
+    "Translate to English: '...'"), jadi tempat kosong, tanda baca, dan kata sambung dibuang.
+    Kata petunjuk dalam kurung tetap dihitung karena itu bagian isi soal.
+    """
+    core = _core_sentence(text)
+    core = re.sub(r"_+|\u2026|\.\.\.", " ", core)
+    core = re.sub(r"[^\w\s']", " ", core)
+    return " ".join(word for word in core.split() if word not in _FILLER_WORDS)
+
+
 def _signature(question: str, options: Optional[List[str]] = None) -> str:
     """Teks pembanding soal. Pilihan ganda sering punya kalimat soal yang umum banget
     ("Choose the correct sentence."), jadi pilihan jawabannya ikut dibandingin."""
@@ -366,9 +401,11 @@ def _signature(question: str, options: Optional[List[str]] = None) -> str:
 
 
 def _too_similar(candidate: str, references: List[str], limit: float) -> bool:
-    candidate_core = _core_sentence(candidate)
+    candidate_core = _comparable_text(candidate)
+    if not candidate_core:
+        return False
     for reference in references:
-        reference_core = _core_sentence(reference)
+        reference_core = _comparable_text(reference)
         score = max(
             fuzz.ratio(candidate_core, reference_core),
             fuzz.token_sort_ratio(candidate_core, reference_core),
@@ -384,12 +421,27 @@ def _fetch_topic_bank(topic: str) -> List[Dict[str, Any]]:
     client = get_service_client()
     result = (
         client.table("exercise")
-        .select("type, question, options, expected_answer")
+        .select("exercise_id, type, topic, question, options, expected_answer")
         .eq("topic", topic)
         .limit(50)
         .execute()
     )
     return list(result.data)
+
+
+# Aturan kunci jawaban per tipe. Terjemahan dan isian memang boleh punya beberapa jawaban
+# benar, jadi validator gak boleh nolak soal cuma karena kuncinya lebih dari satu.
+_VALIDATOR_ANSWER_RULE: Dict[str, str] = {
+    "multiple_choice": "Kunci jawaban benar, ada di pilihan, dan cuma satu pilihan yang benar.",
+    "fill_blank": (
+        "Ada tepat satu tempat kosong ___, petunjuk dalam kurung bikin jawabannya jelas, dan "
+        "semua jawaban di kunci benar buat ngisi tempat kosong itu."
+    ),
+    "translate": (
+        "Semua jawaban di kunci adalah terjemahan bahasa Inggris yang benar dari kalimat "
+        "bahasa Indonesia di soal. Terjemahan lain yang juga benar itu wajar, bukan alasan TIDAK_VALID."
+    ),
+}
 
 
 def _validate_generated(
@@ -408,10 +460,11 @@ def _validate_generated(
         f"Materi lesson: {topic}\n"
         f"Contoh soal lesson untuk materi ini: {bank_text}\n\n"
         f"Soal baru ({generated.type}): {generated.question}{options_text}\n"
-        f"Kunci jawaban: {generated.expected_answer}\n\n"
+        f"Kunci jawaban: {generated.expected_answer}\n"
+        "Tanda | di kunci jawaban memisahkan jawaban lain yang sama-sama diterima.\n\n"
         "VALID hanya kalau SEMUA benar:\n"
         "1. Soal menguji materi lesson di atas (bukan materi lain).\n"
-        "2. Kunci jawaban benar dan cuma satu jawaban yang benar.\n"
+        f"2. {_VALIDATOR_ANSWER_RULE[generated.type]}\n"
         "3. Bahasa Inggrisnya benar dan wajar."
     )
     try:
@@ -515,7 +568,7 @@ def _generate_one_question(
 
         # Tipe soal harus persis yang diminta user.
         if generated.type != tipe_soal or (
-            tipe_soal == "fill_blank" and "___" not in generated.question
+            tipe_soal == "fill_blank" and generated.question.count("___") != 1
         ):
             call_logs.append(
                 _log_entry(attempt_number, "format_tidak_valid", token_used, temperature, elapsed_ms)
@@ -592,6 +645,82 @@ def _plan_types(tipe_soal: str, jumlah_soal: int) -> List[str]:
     return [cycle[index % len(cycle)] for index in range(jumlah_soal)]
 
 
+def _bank_question(row: Dict[str, Any], fallback_topic: str) -> Dict[str, Any]:
+    return {
+        "exercise_id": row.get("exercise_id"),
+        "type": row["type"],
+        "topic": row.get("topic") or fallback_topic,
+        "question": row["question"],
+        "options": row.get("options") if row["type"] == "multiple_choice" else None,
+        "expected_answer": row["expected_answer"],
+        "source": "fallback_original",
+    }
+
+
+def _fill_from_bank(
+    user_id: UUID,
+    questions_by_index: Dict[int, Dict[str, Any]],
+    jumlah_soal: int,
+    topic_plan: List[str],
+    type_plan: List[str],
+    bank_by_topic: Dict[str, List[Dict[str, Any]]],
+) -> None:
+    """Isi nomor yang kosong pakai soal bank soal, tanpa soal yang sama dipakai dua kali.
+
+    Urutan pilihan: topik & tipe sama -> tipe sama di topik latihan ini -> topik sama tipe
+    lain -> topik lain yang udah kebuka buat user ini.
+    """
+    used = {item["question"].strip().lower() for item in questions_by_index.values()}
+
+    def usable(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return [
+            row
+            for row in rows
+            if row.get("question") and row.get("expected_answer") and row.get("type")
+            and row["question"].strip().lower() not in used
+        ]
+
+    plan_topics = list(dict.fromkeys(topic_plan))
+    extra_rows: Optional[List[Dict[str, Any]]] = None
+
+    for index in range(jumlah_soal):
+        if index in questions_by_index:
+            continue
+        topic, wanted_type = topic_plan[index], type_plan[index]
+        own = usable(bank_by_topic.get(topic, []))
+        plan_rows = usable([row for name in plan_topics for row in bank_by_topic.get(name, [])])
+        candidates = (
+            [row for row in own if row["type"] == wanted_type]
+            or [row for row in plan_rows if row["type"] == wanted_type]
+            or own
+            or plan_rows
+        )
+        if not candidates:
+            if extra_rows is None:
+                extra_rows = _fetch_unlocked_bank(user_id, plan_topics)
+            other = usable(extra_rows)
+            candidates = [row for row in other if row["type"] == wanted_type] or other
+        if not candidates:
+            continue
+        row = random.choice(candidates)
+        used.add(row["question"].strip().lower())
+        questions_by_index[index] = _bank_question(row, topic)
+
+    filled = sum(1 for item in questions_by_index.values() if item["source"] == "fallback_original")
+    if filled:
+        logger.info("Latihan AI user %s: %s soal diisi dari bank soal biar jumlahnya pas", user_id, filled)
+
+
+def _fetch_unlocked_bank(user_id: UUID, skip_topics: List[str]) -> List[Dict[str, Any]]:
+    from app.services.unlock_service import get_unlocked_topics
+
+    rows: List[Dict[str, Any]] = []
+    for topic in get_unlocked_topics(user_id):
+        if topic not in skip_topics:
+            rows.extend(_fetch_topic_bank(topic))
+    return rows
+
+
 def generate_practice(
     user_id: UUID,
     jumlah_soal: int,
@@ -601,8 +730,9 @@ def generate_practice(
     topic_statistics: Optional[TopicStatistics] = None,
 ) -> Tuple[List[Dict[str, Any]], str, Optional[str]]:
     """Bikin soal Latihan AI. Semua soal hasil AI yang lolos cek: beda dari soal lesson,
-    sesuai materi topiknya, sesuai tipe yang diminta. Gak ada lagi soal lesson yang
-    disisipin sebagai pengganti; kalau AI gagal, soal itu dilewati (status partial)."""
+    sesuai materi topiknya, sesuai tipe yang diminta. Nomor yang gagal dicoba lagi beberapa
+    ronde selama waktunya cukup. Kalau tetap kurang, sisanya diisi soal bank soal biar jumlah
+    soal sama persis dengan pilihan user. Status partial cuma kalau bank soal juga habis."""
     topic_scores, jumlah_data_per_topic, _ = topic_statistics or fetch_topic_statistics(user_id)
     weak_topics = determine_weak_topics(topic_scores, jumlah_data_per_topic)
     _persist_topic_scores(user_id, topic_scores, jumlah_data_per_topic, weak_topics)
@@ -610,6 +740,14 @@ def generate_practice(
     resolved_topics = _resolve_topics(fokus_topik, weak_topics, topic_scores, jumlah_data_per_topic)
     if not resolved_topics:
         return [], "partial", "rejected"
+
+    # Kuota token harian dicek sekali buat satu latihan penuh. Kalau gak cukup, latihan gak
+    # dimulai sama sekali, daripada soalnya keluar setengah.
+    try:
+        check_and_add_daily_token_usage(str(user_id), calculate_max_tokens(jumlah_soal))
+    except RateLimitExceeded:
+        logger.info("Kuota token harian user %s gak cukup buat %s soal", user_id, jumlah_soal)
+        return [], "partial", "quota"
 
     topic_plan = _allocate_topics(resolved_topics, jumlah_soal)
     type_plan = _plan_types(tipe_soal, jumlah_soal)
@@ -619,20 +757,19 @@ def generate_practice(
     deadline = time.monotonic() + GENERATION_DEADLINE_SECONDS
     all_logs: List[AiCallLogEntry] = []
 
-    def run_round(indexes: List[int], known_questions: List[str]) -> Dict[int, PracticeGeneratorAiOutput]:
-        """Bikin soal buat beberapa nomor sekaligus (paralel). Return nomor -> soal yang lolos cek."""
-        allowed: List[int] = []
-        for index in indexes:
-            try:
-                check_and_add_daily_token_usage(str(user_id), calculate_max_tokens(1))
-            except RateLimitExceeded:
-                logger.info("Kuota token harian user %s habis di soal ke-%s", user_id, index + 1)
-                break
-            allowed.append(index)
+    def run_round(
+        slots: List[Tuple[int, str]], known_questions: List[str]
+    ) -> List[Tuple[int, PracticeGeneratorAiOutput]]:
+        """Bikin soal buat beberapa slot sekaligus (paralel). Satu nomor soal boleh punya
+        lebih dari satu slot (situasi beda), biar kalau satu ditolak masih ada cadangan.
+        Return daftar (nomor soal, soal yang lolos cek)."""
+        # Kuota token udah dicek sekali di awal buat semua soal, jadi di sini gak ada soal
+        # yang dilewati gara-gara kuota habis di tengah jalan.
+        allowed = list(slots)
         if not allowed:
-            return {}
+            return []
 
-        results: Dict[int, PracticeGeneratorAiOutput] = {}
+        results: List[Tuple[int, PracticeGeneratorAiOutput]] = []
         executor = ThreadPoolExecutor(max_workers=min(MAX_PARALLEL_GENERATIONS, len(allowed)))
         futures = {
             executor.submit(
@@ -642,10 +779,10 @@ def generate_practice(
                 tingkat_kesulitan=tingkat_kesulitan,
                 batch_questions=known_questions,
                 bank_rows=bank_by_topic[topic_plan[index]],
-                scenario=scenarios[index % len(scenarios)],
+                scenario=scenario,
                 deadline=deadline,
             ): index
-            for index in allowed
+            for index, scenario in allowed
         }
         try:
             for future in as_completed(futures, timeout=max(0.1, deadline - time.monotonic())):
@@ -656,31 +793,66 @@ def generate_practice(
                     continue
                 all_logs.extend(round_logs)
                 if generated is not None:
-                    results[futures[future]] = generated
+                    results.append((futures[future], generated))
         except FuturesTimeout:
             logger.info("Generate soal user %s kena batas waktu, soal yang belum jadi dilewati", user_id)
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
         return results
 
-    def keep_unique(found: Dict[int, PracticeGeneratorAiOutput]) -> None:
-        """Masukin soal sesuai urutan nomor, buang yang mirip soal lain di latihan ini."""
-        for index in sorted(found):
-            candidate = found[index]
-            if _too_similar(candidate.question, [item.question for item in accepted.values()], BATCH_SIMILARITY_LIMIT):
+    accepted: Dict[int, PracticeGeneratorAiOutput] = {}
+
+    def keep_unique(found: List[Tuple[int, PracticeGeneratorAiOutput]]) -> None:
+        """Isi nomor yang masih kosong, buang soal yang mirip soal lain di latihan ini.
+        Soal lebih buat nomor yang udah keisi dipindah ke nomor kosong dengan tipe dan
+        topik yang sama, biar jumlah soal tetap sesuai pilihan user."""
+        spare: List[Tuple[int, PracticeGeneratorAiOutput]] = []
+        for index, candidate in sorted(found, key=lambda item: item[0]):
+            if index in accepted:
+                spare.append((index, candidate))
+                continue
+            if _too_similar(
+                candidate.question, [item.question for item in accepted.values()], BATCH_SIMILARITY_LIMIT
+            ):
                 continue
             accepted[index] = candidate
+        for source_index, candidate in spare:
+            open_index = next(
+                (
+                    index
+                    for index in range(jumlah_soal)
+                    if index not in accepted
+                    and type_plan[index] == type_plan[source_index]
+                    and topic_plan[index] == topic_plan[source_index]
+                ),
+                None,
+            )
+            if open_index is None:
+                continue
+            if _too_similar(
+                candidate.question, [item.question for item in accepted.values()], BATCH_SIMILARITY_LIMIT
+            ):
+                continue
+            accepted[open_index] = candidate
 
-    accepted: Dict[int, PracticeGeneratorAiOutput] = {}
-    keep_unique(run_round(list(range(jumlah_soal)), []))
+    # Ronde pertama: satu slot per nomor. Ronde berikutnya cuma buat nomor yang masih kosong,
+    # tiap nomor dapat 2 slot dengan situasi beda. Diulang selama waktunya masih cukup.
+    for round_number in range(MAX_GENERATION_ROUNDS):
+        missing = [index for index in range(jumlah_soal) if index not in accepted]
+        if not missing:
+            break
+        if round_number > 0 and time.monotonic() >= deadline - MIN_SECONDS_FOR_NEW_ROUND:
+            break
+        if round_number == 0:
+            slots = [(index, scenarios[index % len(scenarios)]) for index in missing]
+        else:
+            # Cadangan per nomor dibatasin biar semua slot tetap jalan barengan dalam satu gelombang.
+            copies = max(1, min(EXTRA_SLOTS_PER_MISSING, MAX_PARALLEL_GENERATIONS // len(missing)))
+            slots = [(index, random.choice(SCENARIO_POOL)) for index in missing for _ in range(copies)]
+        keep_unique(run_round(slots, [item.question for item in accepted.values()]))
 
-    # Ronde kedua (paralel juga) cuma buat nomor yang gagal/kembar, kalau waktunya masih ada.
-    missing = [index for index in range(jumlah_soal) if index not in accepted]
-    if missing and time.monotonic() < deadline - 5:
-        keep_unique(run_round(missing, [item.question for item in accepted.values()]))
-
-    questions: List[Dict[str, Any]] = [
-        {
+    questions_by_index: Dict[int, Dict[str, Any]] = {
+        index: {
             "exercise_id": None,
             "type": accepted[index].type,
             "topic": topic_plan[index],
@@ -689,8 +861,16 @@ def generate_practice(
             "expected_answer": accepted[index].expected_answer,
             "source": "ai_generated",
         }
-        for index in sorted(accepted)
-    ]
+        for index in accepted
+    }
+
+    # Jumlah soal harus sama persis dengan pilihan user. Nomor yang tetap gagal dibikin AI
+    # diisi soal dari bank soal (ditandai "Soal dari bank soal" di layar).
+    # Kalau AI gagal total, tetap error biar user tahu AI-nya lagi bermasalah.
+    if questions_by_index and len(questions_by_index) < jumlah_soal:
+        _fill_from_bank(user_id, questions_by_index, jumlah_soal, topic_plan, type_plan, bank_by_topic)
+
+    questions: List[Dict[str, Any]] = [questions_by_index[index] for index in sorted(questions_by_index)]
 
     status_value = "ready" if len(questions) == jumlah_soal else "partial"
     failure_reason: Optional[str] = None
