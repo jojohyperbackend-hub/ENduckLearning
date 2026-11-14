@@ -33,13 +33,13 @@ const LessonFlow = ({ lesson, hearts, submitAnswer, finish }: LessonFlowProps) =
     return (
       <LessonSummary
         stats={summary}
-        title="Lesson selesai"
+        title="Pelajaran selesai"
         message={
           isPerfect
-            ? "Semua jawabanmu benar. Lanjut ke lesson berikutnya selagi lagi lancar."
+            ? "Semua jawabanmu benar. Lanjut ke pelajaran berikutnya selagi lagi lancar."
             : `${summary.wrong} soal yang salah masuk ke Lihat Kesalahan, jadi bisa diulang kapan saja.`
         }
-        onFinish={() => navigate("/lessons")}
+        onFinish={() => navigate("/dashboard")}
         secondary={summary.wrong > 0 ? { label: "Buka Tinjauan", to: "/progress#review" } : null}
       />
     );
@@ -50,7 +50,7 @@ const LessonFlow = ({ lesson, hearts, submitAnswer, finish }: LessonFlowProps) =
       items={lesson.exercises}
       initialHearts={hearts}
       exitLabel="Keluar dari pelajaran"
-      wrongHint="Heart −1. Soal ini masuk Review supaya bisa kamu ulang nanti."
+      wrongHint="Nyawa −1. Soal ini masuk Peninjauan supaya bisa kamu ulang nanti."
       finishLabel="Selesaikan pelajaran"
       submit={submitAnswer}
       finish={handleFinish}

@@ -107,7 +107,7 @@ const LessonSummary = ({ stats, title, message, onFinish, secondary = null }: Le
         <div className="flex w-full flex-col items-center justify-center gap-3 sm:flex-row">
           <div className="w-full sm:w-auto [&>button]:w-full sm:[&>button]:w-auto">
             <Button onClick={onFinish} size="lg">
-              Kembali ke lessons
+              Kembali ke dashboard
             </Button>
           </div>
           {secondary?.to && (
