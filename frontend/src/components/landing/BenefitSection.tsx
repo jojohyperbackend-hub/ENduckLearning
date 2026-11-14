@@ -60,10 +60,10 @@ const TryQuestion = () => {
     <Card className="flex h-full flex-col gap-5 p-5 sm:p-7">
       <div>
         <h3 className="font-heading text-card-header font-bold">
-          Lesson pendek, langsung dikerjain
+          Soal pendek, langsung dikerjain
         </h3>
         <p className="mt-1 text-body">
-          Tiap lesson isinya beberapa soal kayak gini. Cobain satu:
+          Tiap pelajaran isinya beberapa soal kayak gini. Cobain satu:
         </p>
       </div>
 

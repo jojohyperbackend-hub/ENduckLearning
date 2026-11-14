@@ -131,7 +131,7 @@ const QuizForm = ({ topics, isSubmitting, error, initial, onSubmit }: QuizFormPr
         <div className="flex flex-col gap-3 border-t-2 border-[var(--color-text)]/15 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-body-lg">
             Sampai <span className="font-heading font-extrabold">+{count * AI_XP_CORRECT} XP</span>{" "}
-            kalau semua benar. Jawaban salah &minus;{AI_XP_WRONG} XP, heart gak berkurang.
+            kalau semua benar. Jawaban salah &minus;{AI_XP_WRONG} XP, Nyawa gak berkurang.
           </p>
           <div className="shrink-0 [&>button]:w-full sm:[&>button]:w-auto">
             <Button

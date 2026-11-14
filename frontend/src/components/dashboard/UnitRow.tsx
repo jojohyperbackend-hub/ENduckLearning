@@ -38,7 +38,7 @@ const UnitRow = ({ unit, onOpenLesson }: UnitRowProps) => {
 
       {unit.lessons.length === 0 ? (
         <p className="mt-4 text-body text-[var(--color-text)]/70">
-          Lesson buat unit ini belum ada.
+          Pelajaran buat unit ini belum ada.
         </p>
       ) : (
         <ol className="m-0 mt-5 grid list-none grid-cols-4 gap-x-2 gap-y-5 p-0 sm:grid-cols-6 lg:grid-cols-8">
@@ -53,7 +53,7 @@ const UnitRow = ({ unit, onOpenLesson }: UnitRowProps) => {
               />
               <span aria-hidden="true" className="leading-tight">
                 <span className="block font-heading text-body font-bold">
-                  Lesson {lesson.number}
+                  Pelajaran {lesson.number}
                 </span>
                 <span className="block text-caption text-[var(--color-text)]/70">
                   {stateText[lesson.state]}

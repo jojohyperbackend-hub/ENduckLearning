@@ -118,7 +118,7 @@ const SunrisePath = ({
                     ].join(" ")}
                   >
                     <p className="font-heading text-body-lg font-bold">
-                      {longLabel ? `Lesson ${lesson.number}` : lesson.number}
+                      {longLabel ? `Pelajaran ${lesson.number}` : lesson.number}
                     </p>
                     {(longLabel || lesson.state === "active") && (
                       <p

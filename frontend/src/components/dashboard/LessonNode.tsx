@@ -29,7 +29,7 @@ const CONFETTI = [
 const stateLabel: Record<LessonState, string> = {
   done: "selesai, ketuk buat ngulang",
   active: "siap dikerjain",
-  locked: "terkunci, selesaikan lesson sebelumnya dulu",
+  locked: "terkunci, selesaikan pelajaran sebelumnya dulu",
 };
 
 const LessonNode = ({
@@ -64,8 +64,8 @@ const LessonNode = ({
         disabled={isLocked}
         onClick={onOpen}
         data-active-node={state === "active" ? "" : undefined}
-        aria-label={`Lesson ${lessonNumber}, ${stateLabel[state]}${isLocked ? "" : `, ${xp} XP`}`}
-        title={isLocked ? "Selesaikan lesson sebelumnya dulu" : undefined}
+        aria-label={`Pelajaran ${lessonNumber}, ${stateLabel[state]}${isLocked ? "" : `, ${xp} XP`}`}
+        title={isLocked ? "Selesaikan pelajaran sebelumnya dulu" : undefined}
         style={{ width: dimension, height: dimension } as CSSProperties}
         className={[
           "flex items-center justify-center rounded-[30%] transition-[transform,box-shadow,filter,background-color] duration-150",

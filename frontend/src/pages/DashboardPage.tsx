@@ -99,7 +99,7 @@ const StatusStrip = ({
       <li className={chip}>
         <span
           role="img"
-          aria-label={`${hearts} dari ${MAX_HEARTS} heart tersisa`}
+          aria-label={`${hearts} dari ${MAX_HEARTS} nyawa tersisa`}
           className="flex items-center gap-0.5"
         >
           {Array.from({ length: MAX_HEARTS }, (_, index) => (
@@ -128,7 +128,7 @@ const StatusStrip = ({
             className="text-[var(--color-correct)]"
             aria-hidden="true"
           />
-          {badges.length} badge
+          {badges.length} Lencana
         </li>
       )}
     </ul>
@@ -228,15 +228,15 @@ const ReviewCard = ({ reviewCount }: { reviewCount: number | null }) => {
 
       <p className="font-heading text-3xl font-extrabold leading-none sm:text-4xl">
         {reviewCount === null
-          ? "Review"
+          ? "Tinjau"
           : reviewCount === 0
-            ? "Review kosong"
+            ? "Tinjauan kosong"
             : `${reviewCount} soal di Tinjau`}
       </p>
 
       <p className="text-body text-[var(--color-bg-card)]/85">
         {reviewCount === null
-          ? "Jumlah soal Review belum bisa dimuat. Coba muat ulang halaman ini."
+          ? "Jumlah soal yang di tinjau belum bisa dimuat. Coba muat ulang halaman ini."
           : reviewCount === 0
             ? "Belum ada jawaban salah yang perlu diulang."
             : "Soal yang pernah salah muncul lagi sampai kamu jawab benar."}

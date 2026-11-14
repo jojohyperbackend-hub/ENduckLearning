@@ -18,7 +18,7 @@ const LessonSegments = ({ lessons, className = "" }: LessonSegmentsProps) => {
   return (
     <div
       role="img"
-      aria-label={`${doneCount} dari ${lessons.length} lesson selesai`}
+      aria-label={`${doneCount} dari ${lessons.length} pelajaran selesai`}
       className={`flex gap-1.5 ${className}`}
     >
       {lessons.map((lesson) => (

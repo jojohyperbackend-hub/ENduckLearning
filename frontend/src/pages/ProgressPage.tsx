@@ -102,7 +102,7 @@ const ProgressContent = ({
               <p className="mt-1 text-body">
                 {progress.current_streak > 0
                   ? "Streak belajar berturut-turut"
-                  : "Belum ada streak. Mulai dari lesson hari ini."}
+                  : "Belum ada streak. Mulai dari pelajaran hari ini."}
               </p>
             </div>
           </div>
@@ -127,8 +127,8 @@ const ProgressContent = ({
             </div>
             <p className="text-body">
               {hearts === MAX_HEARTS || clock.nextIn === null
-                ? "Heart penuh. Salah jawab di lesson ngurangin 1 heart dan 12 XP. Heart pertama balik 18 menit kemudian, berikutnya tiap 7 menit."
-                : `${hearts} heart tersisa. Heart berikutnya balik dalam ${formatCountdown(clock.nextIn)}.`}
+                ? "Nyawa penuh. Salah jawab di pelajaran ngurangin 1 nyawa dan 12 XP. Nyawa pertama balik 18 menit kemudian, berikutnya tiap 7 menit."
+                : `${hearts} Nyawa tersisa. nyawa berikutnya balik dalam ${formatCountdown(clock.nextIn)}.`}
             </p>
           </div>
         </Card>
@@ -156,13 +156,13 @@ const ProgressContent = ({
                       Unit {unitIndex + 1}: {unit.title}
                     </p>
                     <p className="text-body font-semibold">
-                      {total > 0 && done === total ? "Selesai" : `${done} dari ${total} lesson`}
+                      {total > 0 && done === total ? "Selesai" : `${done} dari ${total} pelajaran`}
                     </p>
                   </div>
                   <ProgressSegments
                     done={done}
                     total={total}
-                    label={`${done} dari ${total} lesson di unit ${unitIndex + 1} selesai`}
+                    label={`${done} dari ${total} pelajaran di unit ${unitIndex + 1} selesai`}
                   />
                 </div>
               );
@@ -173,7 +173,7 @@ const ProgressContent = ({
 
       <div className="flex flex-col gap-4">
         <SectionHeading
-          title="Badge"
+          title="Lencana"
           aside={`${badgeStats.earnedCount} dari ${badgeStats.total} terkumpul`}
         />
         <BadgeShelf badges={progress.badges} totalXp={progress.total_xp} />
@@ -182,7 +182,7 @@ const ProgressContent = ({
       <div className="flex flex-col gap-4">
         <SectionHeading
           id="review"
-          title="Review"
+          title="Tinjauan"
           aside={reviewCount === null ? undefined : `${reviewCount} soal menunggu`}
         />
         <p className="-mt-2 max-w-[60ch] text-body-lg">

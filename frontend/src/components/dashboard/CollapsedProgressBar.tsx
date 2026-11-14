@@ -57,8 +57,8 @@ const CollapsedProgressBar = ({
       <span className="flex items-center justify-between gap-3 text-body">
         <span className="font-semibold">
           {unit.isComplete
-            ? `${total} lesson selesai`
-            : `Lesson ${current} dari ${total}`}
+            ? `${total} pelajaran selesai`
+            : `Pelajaran ${current} dari ${total}`}
         </span>
         <span className="text-[var(--color-text)]/70">
           {isOpen ? "Ketuk buat nutup" : "Ketuk buat lihat jalurnya"}

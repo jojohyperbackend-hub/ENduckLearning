@@ -96,7 +96,7 @@ const StatsBar = () => {
         <span className="font-heading text-4xl font-extrabold leading-none">
           {lessonCount}
         </span>
-        <span className="text-body-lg">lesson</span>
+        <span className="text-body-lg">pelajaran</span>
       </p>
       <p className="flex items-baseline gap-2">
         <span className="font-heading text-4xl font-extrabold leading-none">
@@ -104,7 +104,7 @@ const StatsBar = () => {
         </span>
         <span className="text-body-lg">soal latihan</span>
       </p>
-      <p className="text-body-lg">Plus soal tambahan dari AI sesuai kelemahanmu.</p>
+      <p className="text-body-lg">Dan soal tambahan dari AI sesuai kelemahanmu.</p>
     </div>
   );
 };
@@ -184,7 +184,7 @@ const FinalCtaSection = () => {
   return (
     <div className="flex flex-col items-start gap-6 rounded-3xl bg-[var(--color-text)] px-6 py-10 text-[var(--color-bg-card)] sm:px-10 sm:py-12 lg:flex-row lg:items-center lg:justify-between">
       <h2 className="max-w-[18ch] font-heading text-3xl font-bold leading-tight sm:text-4xl">
-        Satu lesson dulu, sisanya nanti.
+        Satu pelajaran dulu, sisanya nanti.
       </h2>
       <Link to="/login">
         <Button size="lg">Daftar gratis</Button>

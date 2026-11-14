@@ -46,7 +46,7 @@ export const BADGE_CATALOG: BadgeCatalogEntry[] = [
   },
   {
     code: "cie_udah_compe_nih",
-    name: "Cie Udah Compe Nih",
+    name: "Mulai Serius Nih",
     criteriaType: "lesson_correct_streak",
     criteriaValue: 4,
     icon: "target",

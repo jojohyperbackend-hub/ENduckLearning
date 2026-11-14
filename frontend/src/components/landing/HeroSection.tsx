@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import Button from "../common/Button";
-import illustration from "../../assets/landing.png";
+import illustration from "../../assets/Logo-col.svg";
 
 const HeroSection = () => {
   const [parallaxY, setParallaxY] = useState(0);

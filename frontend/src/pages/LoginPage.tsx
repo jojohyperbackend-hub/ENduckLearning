@@ -112,11 +112,11 @@ const LoginPage = () => {
 
     if (isRegister) {
       if (password.length < MIN_PASSWORD_LENGTH) {
-        setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+        setError(`Password minimal ${MIN_PASSWORD_LENGTH} karakter.`);
         return;
       }
       if (password !== confirmPassword) {
-        setError("Passwords do not match.");
+        setError("Password tidak sesuai.");
         return;
       }
     }
@@ -241,7 +241,7 @@ const LoginPage = () => {
             >
               <motion.div variants={fadeUp}>
                 <Input
-                  variant="login"
+                  variant="email"
                   label="Email"
                   type="email"
                   name="email"
@@ -279,7 +279,7 @@ const LoginPage = () => {
                   >
                     <Input
                       variant="login"
-                      label="Repeat Password"
+                      label="Ulangi Password"
                       type="password"
                       name="confirmPassword"
                       autoComplete="new-password"
