@@ -1,3 +1,4 @@
+import logging
 import math
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -21,6 +22,8 @@ HEART_FIRST_REGEN_SECONDS = 18 * 60
 HEART_NEXT_REGEN_SECONDS = 7 * 60
 
 HEARTS_EMPTY_CODE = "HEARTS_EMPTY"
+
+logger = logging.getLogger("app.services.progress_service")
 
 _PROGRESS_COLUMNS = (
     "user_id, total_xp, current_streak, hearts_remaining, current_lesson_id, heart_regen_timestamps"
@@ -197,26 +200,85 @@ def require_hearts(user_id: UUID) -> Dict[str, Any]:
     return row
 
 
+_BADGE_JOIN_FULL = "badge_id, earned_at, badge(name, code, criteria_type, criteria_value)"
+_BADGE_JOIN_LEGACY = "badge_id, earned_at, badge(criteria_type, criteria_value)"
+
+
 def fetch_user_badges(user_id: UUID) -> List[BadgeOut]:
     client = get_service_client()
-    result = (
-        client.table("user_badge")
-        .select("badge_id, earned_at, badge(criteria_type, criteria_value)")
-        .eq("user_id", str(user_id))
-        .execute()
-    )
+    try:
+        result = (
+            client.table("user_badge")
+            .select(_BADGE_JOIN_FULL)
+            .eq("user_id", str(user_id))
+            .execute()
+        )
+    except Exception:
+        # Kolom name/code belum ada (migration 005 belum dijalanin): tetep tampilin badge lama.
+        logger.warning("Kolom badge.name/code belum ada, jalanin migrations/005_badges.sql")
+        result = (
+            client.table("user_badge")
+            .select(_BADGE_JOIN_LEGACY)
+            .eq("user_id", str(user_id))
+            .execute()
+        )
     badges: List[BadgeOut] = []
     for row in result.data:
         badge_info = row.get("badge") or {}
         badges.append(
             BadgeOut(
                 badge_id=UUID(row["badge_id"]),
+                name=badge_info.get("name"),
+                code=badge_info.get("code"),
                 criteria_type=badge_info.get("criteria_type", ""),
                 criteria_value=badge_info.get("criteria_value", 0),
                 earned_at=row["earned_at"],
             )
         )
     return badges
+
+
+def fetch_lesson_answer_streaks(user_id: UUID) -> Dict[str, int]:
+    """Jumlah jawaban bener/salah berturut-turut di lesson (lintas lesson/unit)."""
+    client = get_service_client()
+    ensure_user_progress_exists(user_id)
+    try:
+        result = (
+            client.table("user_progress")
+            .select("lesson_correct_streak, lesson_wrong_streak")
+            .eq("user_id", str(user_id))
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        logger.warning("Kolom streak lesson belum ada, jalanin migrations/005_badges.sql")
+        return {"lesson_correct_streak": 0, "lesson_wrong_streak": 0}
+    row = result.data[0] if result.data else {}
+    return {
+        "lesson_correct_streak": int(row.get("lesson_correct_streak") or 0),
+        "lesson_wrong_streak": int(row.get("lesson_wrong_streak") or 0),
+    }
+
+
+def record_lesson_answer(user_id: UUID, is_correct: bool) -> Dict[str, int]:
+    """Catat 1 jawaban lesson. Bener: counter bener +1, counter salah balik 0. Salah: kebalikannya."""
+    current = fetch_lesson_answer_streaks(user_id)
+    if is_correct:
+        updated = {
+            "lesson_correct_streak": current["lesson_correct_streak"] + 1,
+            "lesson_wrong_streak": 0,
+        }
+    else:
+        updated = {
+            "lesson_correct_streak": 0,
+            "lesson_wrong_streak": current["lesson_wrong_streak"] + 1,
+        }
+    client = get_service_client()
+    try:
+        client.table("user_progress").update(updated).eq("user_id", str(user_id)).execute()
+    except Exception:
+        logger.warning("Gagal simpan streak lesson, jalanin migrations/005_badges.sql")
+    return updated
 
 
 def get_user_progress(user_id: UUID) -> ProgressOut:

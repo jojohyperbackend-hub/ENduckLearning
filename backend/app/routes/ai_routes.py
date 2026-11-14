@@ -273,9 +273,12 @@ def attempt_quiz_question(
         record_attempt_log(user_id, question_row["topic"], is_correct)
 
         # Latihan AI: benar +XP, salah -XP. Heart gak disentuh sama sekali.
+        badge_earned = None
         if is_correct:
             xp_earned = XP_PER_CORRECT_ANSWER_AI_QUIZ
             add_xp(user_id, xp_earned)
+            # XP badge (Calon Juara / Sang Juara) langsung dicek begitu XP nyentuh target.
+            badge_earned = check_and_award_badges(user_id)
         else:
             xp_earned = -deduct_xp(user_id, XP_PENALTY_WRONG_AI_QUIZ)
         progress_row = fetch_user_progress_row(user_id)
@@ -296,6 +299,7 @@ def attempt_quiz_question(
         xp_earned=xp_earned,
         feedback=feedback_text,
         grammar_note=grammar_note,
+        badge_earned=badge_earned,
         **heart_fields(progress_row),
     )
     return success_response(result)

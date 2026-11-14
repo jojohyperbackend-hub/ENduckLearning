@@ -44,6 +44,9 @@ export interface HeartState {
 // ---------- Badge & progress ----------
 export interface Badge {
   badge_id: string;
+  // Dari tabel badge (migration 005). Bisa null kalau migration belum dijalanin.
+  name?: string | null;
+  code?: string | null;
   criteria_type: string;
   criteria_value: number;
   earned_at: string;

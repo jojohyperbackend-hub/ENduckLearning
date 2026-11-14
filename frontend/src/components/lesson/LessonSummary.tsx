@@ -1,11 +1,12 @@
 import { Link } from "react-router";
-import { Award, Flame, RotateCcw, Star } from "lucide-react";
+import { RotateCcw, Star } from "lucide-react";
 import Button from "../common/Button";
 import Card from "../common/Card";
 import CountUp from "../common/CountUp";
 import SunMarker from "../dashboard/SunMarker";
 import type { Badge as BadgeType } from "../../types";
-import { badgeHint, badgeLabel } from "../../utils/formatters";
+import { badgeDescription, badgeIconKey, badgeTitle } from "../../utils/badgeCatalog";
+import BadgeSeal from "../progress/BadgeSeal";
 
 export interface LessonStats {
   correct: number;
@@ -82,22 +83,22 @@ const LessonSummary = ({ stats, title, message, onFinish, secondary = null }: Le
 
         {stats.badge && (
           <div className="flex w-full items-center gap-4 rounded-2xl bg-[var(--color-text)] p-4 text-left text-[var(--color-bg-card)]">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[var(--color-cta)] text-[var(--color-text)]">
-              {stats.badge.criteria_type === "current_streak" ? (
-                <Flame size={28} aria-hidden="true" />
-              ) : (
-                <Award size={28} aria-hidden="true" />
-              )}
-            </span>
+            <BadgeSeal
+              icon={badgeIconKey(stats.badge)}
+              fill="var(--color-cta)"
+              ink="var(--color-text)"
+              iconSize={26}
+              className="relative h-16 w-16"
+            />
             <div className="min-w-0">
               <p className="text-body-sm font-semibold text-[var(--color-bg-card)]/80">
                 Badge baru
               </p>
               <p className="font-heading text-card-header font-bold leading-tight">
-                {badgeLabel(stats.badge.criteria_type, stats.badge.criteria_value)}
+                {badgeTitle(stats.badge)}
               </p>
               <p className="text-body-sm text-[var(--color-bg-card)]/80">
-                {badgeHint(stats.badge.criteria_type, stats.badge.criteria_value)}
+                {badgeDescription(stats.badge)}
               </p>
             </div>
           </div>

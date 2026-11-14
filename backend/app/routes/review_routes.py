@@ -13,6 +13,7 @@ from app.models.schemas import (
     ReviewQueueItemOut,
 )
 from app.services.grading_service import grade_short_answer, grade_translation
+from app.services.milestone_service import check_and_award_badges
 from app.services.progress_service import (
     HEARTS_EMPTY_CODE,
     HeartsEmptyError,
@@ -144,8 +145,11 @@ def attempt_review(
         xp_earned = XP_PER_REVIEW_CORRECT
         add_xp(user_id, xp_earned)
         client.table("review_queue").delete().eq("review_id", str(payload.review_id)).execute()
+        # XP badge (Calon Juara / Sang Juara) langsung dicek begitu XP nyentuh target.
+        badge_earned = check_and_award_badges(user_id)
         progress_row = fetch_user_progress_row(user_id)
     else:
+        badge_earned = None
         xp_earned = 0
         try:
             progress_row = apply_heart_loss(user_id)
@@ -157,6 +161,7 @@ def attempt_review(
         xp_earned=xp_earned,
         feedback=feedback_text,
         grammar_note=grammar_note,
+        badge_earned=badge_earned,
         **heart_fields(progress_row),
     )
     return success_response(result)

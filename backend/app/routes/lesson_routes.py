@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.middleware import get_current_user_id
@@ -15,14 +14,15 @@ from app.models.schemas import (
     LessonCompleteResultOut,
     LessonDetailOut,
 )
-# from app.services.ai_service import generate_translate_feedback
-# from app.services.milestone_service import check_and_award_badges
+from app.services.grading_service import grade_short_answer, grade_translation
+from app.services.milestone_service import check_and_award_badges
 from app.services.progress_service import (
     HEARTS_EMPTY_CODE,
     HeartsEmptyError,
     add_xp,
     apply_heart_loss,
     deduct_xp,
+    record_lesson_answer,
     fetch_user_progress_row,
     heart_fields,
     require_hearts,
@@ -30,7 +30,6 @@ from app.services.progress_service import (
 )
 from app.utils.cache import RateLimitExceeded, check_translate_attempt_rate_limit
 from app.utils.helpers import error_response, success_response, utcnow
-from app.services.grading_service import grade_short_answer, grade_translation
 
 router = APIRouter(tags=["lessons"])
 
@@ -130,27 +129,6 @@ def _xp_per_exercise(lesson_id: UUID) -> int:
         return 0
     return max(1, xp_reward_base // jumlah_exercise)
 
-# def _spend_start_xp(user_id: UUID) -> Dict[str, Any]:
-#     #bayar 10 xp saat memulai lesson. xp 0 tetap boleh mulai (gak jadi minus)
-#     progress_row = fetch_user_progress_row(user_id)
-#     current_xp = progress_row["total_xp"]
-#     cost = min(LESSON_START_XP_COST, current_xp)
-
-#     if cost <=0:
-#         return progress_row
-#     add_xp(user_id, -cost)
-#     return fetch_user_progress_row(user_id)
-
-
-
-# def grade_short_answer(
-#     exercise_type: str,
-#     question: str,
-#     user_answer: str,
-#     expected_answer: str,
-# ) -> bool:
-#     return _normalize_answer(user_answer) == _normalize_answer(expected_answer)
-
 
 def _fetch_exercise_row(exercise_id: UUID) -> Optional[Dict[str, Any]]:
     client = get_service_client()
@@ -211,7 +189,6 @@ def _finish_attempt(
     if is_correct:
         xp_earned = _xp_per_exercise(lesson_id)
         add_xp(user_id, xp_earned)
-        progress_row = fetch_user_progress_row(user_id)
     else:
         # Salah di lesson: heart -1 DAN XP -12 (total XP gak bisa di bawah 0).
         # Heart dikurangin dulu; kalau ternyata heart udah 0, XP gak ikut kepotong.
@@ -221,13 +198,19 @@ def _finish_attempt(
         except HeartsEmptyError:
             return error_response(HEARTS_EMPTY_CODE)
         xp_earned = -deduct_xp(user_id, XP_PENALTY_WRONG_LESSON)
-        progress_row = fetch_user_progress_row(user_id)
+
+    # Streak jawaban lesson (lintas lesson/unit) -> badge Miss Mulu / Cie Udah Compe Nih.
+    # Jawaban yang ditolak karena heart 0 udah return di atas, jadi gak ikut kehitung.
+    lesson_streaks = record_lesson_answer(user_id, is_correct)
+    badge_earned = check_and_award_badges(user_id, lesson_streaks)
+    progress_row = fetch_user_progress_row(user_id)
 
     result = AttemptResultOut(
         correct=is_correct,
         xp_earned=xp_earned,
         feedback=feedback,
         grammar_note=grammar_note,
+        badge_earned=badge_earned,
         **heart_fields(progress_row),
     )
     return success_response(result)
@@ -394,10 +377,12 @@ def complete_lesson(lesson_id: UUID, user_id: UUID = Depends(get_current_user_id
         ).execute()
 
     update_current_lesson(user_id, _next_lesson_id(lesson_row))
+    badge_earned = check_and_award_badges(user_id)
     progress_row = fetch_user_progress_row(user_id)
 
     result = LessonCompleteResultOut(
         xp_earned_total=progress_row["total_xp"],
+        badge_earned=badge_earned,
         **heart_fields(progress_row),
     )
     return success_response(result)

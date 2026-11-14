@@ -1,12 +1,51 @@
 import logging
 import threading
+import time
 from typing import Optional
 
+import httpx
+from postgrest.utils import SyncClient as _PostgrestSession
 from supabase import Client, create_client
 
 from app.config import settings
 
 logger = logging.getLogger("app.database")
+
+# Supabase (PostgREST) dipakai lewat 1 koneksi HTTP/2 bareng-bareng dari banyak thread.
+# Kadang server nutup koneksi itu (GOAWAY -> httpx.RemoteProtocolError "ConnectionTerminated"),
+# dan semua request yang lagi jalan di koneksi itu ikut gagal -> 500.
+# Request yang kena GOAWAY belum diproses server, jadi aman diulang pakai koneksi baru.
+_RETRY_ATTEMPTS = 3
+_RETRY_BACKOFF_SECONDS = 0.15
+_RETRY_ALWAYS = (httpx.RemoteProtocolError, httpx.ConnectError, httpx.PoolTimeout)
+# Error baca cuma diulang buat request yang gak ngubah data.
+_RETRY_READ_ONLY = (httpx.ReadError, httpx.ReadTimeout)
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+_original_session_request = _PostgrestSession.request
+
+
+def _request_with_retry(self, method, url, *args, **kwargs):
+    for attempt in range(1, _RETRY_ATTEMPTS + 1):
+        try:
+            return _original_session_request(self, method, url, *args, **kwargs)
+        except _RETRY_ALWAYS + _RETRY_READ_ONLY as exc:
+            retryable = isinstance(exc, _RETRY_ALWAYS) or str(method).upper() in _SAFE_METHODS
+            if not retryable or attempt == _RETRY_ATTEMPTS:
+                raise
+            logger.warning(
+                "Koneksi Supabase putus (%s), ulang request %s ke-%s",
+                type(exc).__name__,
+                method,
+                attempt + 1,
+            )
+            time.sleep(_RETRY_BACKOFF_SECONDS * attempt)
+    raise RuntimeError("unreachable")
+
+
+if not getattr(_PostgrestSession.request, "_retry_wrapped", False):
+    _request_with_retry._retry_wrapped = True  # type: ignore[attr-defined]
+    _PostgrestSession.request = _request_with_retry  # type: ignore[method-assign]
 
 _service_client: Optional[Client] = None
 _anon_client: Optional[Client] = None

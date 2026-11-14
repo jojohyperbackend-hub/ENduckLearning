@@ -25,6 +25,8 @@ export const badgeLabel = (criteriaType: string, criteriaValue: number): string 
   const value = numberFormat.format(criteriaValue);
   if (criteriaType === "total_xp") return `${value} XP`;
   if (criteriaType === "current_streak") return `Streak ${value} hari`;
+  if (criteriaType === "lesson_correct_streak") return `Bener ${value}x beruntun`;
+  if (criteriaType === "lesson_wrong_streak") return `Salah ${value}x beruntun`;
   return `${topicLabel(criteriaType)} ${value}`;
 };
 
@@ -32,6 +34,8 @@ export const badgeHint = (criteriaType: string, criteriaValue: number): string =
   const value = numberFormat.format(criteriaValue);
   if (criteriaType === "total_xp") return `Terkumpul ${value} XP`;
   if (criteriaType === "current_streak") return `Belajar ${value} hari berturut-turut`;
+  if (criteriaType === "lesson_correct_streak") return `Jawab bener ${value}x berturut-turut di lesson`;
+  if (criteriaType === "lesson_wrong_streak") return `Salah ${value}x berturut-turut di lesson`;
   return "Pencapaian baru";
 };
 

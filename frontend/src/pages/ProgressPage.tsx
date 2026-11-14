@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router";
 import { Flame, Heart } from "lucide-react";
 import BadgeShelf from "../components/progress/BadgeShelf";
+import { badgeCollection } from "../utils/badgeCatalog";
 import ProgressSegments from "../components/progress/ProgressSegments";
 import ReviewSection from "../components/progress/ReviewSection";
 import Button from "../components/common/Button";
@@ -45,6 +46,7 @@ const ProgressContent = ({
   const doneLessons =
     units?.reduce((sum, unit) => sum + unit.lessons.filter((l) => l.completed).length, 0) ?? 0;
   const reviewCount = reviewItems?.length ?? null;
+  const badgeStats = badgeCollection(progress.badges);
 
   // Dari halaman lain (/progress#review): geser ke bagian Review setelah data muncul.
   const { hash } = useLocation();
@@ -172,9 +174,9 @@ const ProgressContent = ({
       <div className="flex flex-col gap-4">
         <SectionHeading
           title="Badge"
-          aside={progress.badges.length > 0 ? `${progress.badges.length} terkumpul` : undefined}
+          aside={`${badgeStats.earnedCount} dari ${badgeStats.total} terkumpul`}
         />
-        <BadgeShelf badges={progress.badges} />
+        <BadgeShelf badges={progress.badges} totalXp={progress.total_xp} />
       </div>
 
       <div className="flex flex-col gap-4">

@@ -62,6 +62,8 @@ class AuthUserData(BaseModel):
 
 class BadgeOut(BaseModel):
     badge_id: UUID
+    name: Optional[str] = None
+    code: Optional[str] = None
     criteria_type: str
     criteria_value: int
     earned_at: datetime
@@ -129,6 +131,8 @@ class AttemptResultOut(HeartStateOut):
     xp_earned: int
     feedback: Optional[str] = None
     grammar_note: Optional[str] = None
+    # Badge streak (Miss Mulu / Cie Udah Compe Nih) bisa langsung kebuka pas jawab soal.
+    badge_earned: Optional[BadgeOut] = None
 
 
 class LessonCompleteResultOut(HeartStateOut):
